@@ -6,7 +6,6 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from rest_framework import status
-from rest_framework.decorators import permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -97,7 +96,6 @@ class GoogleLogin(APIView):
         try:
             data = jwt.decode(token_data["id_token"], options={"verify_signature": False})
             email = data["email"]
-            name = data["name"]
             given_name = data.get("given_name", "")
             family_name = data.get("family_name", "")
             picture_url = data.get("picture", "")
@@ -172,7 +170,7 @@ class UserView(APIView):
         Get current user data for token validation and user info retrieval
         """
         user = request.user
-        
+
         # Format user data to match frontend expectations
         user_data = {
             "id": user.id,
@@ -183,5 +181,5 @@ class UserView(APIView):
             "is_active": user.is_active,
             "date_joined": user.date_joined.isoformat(),
         }
-        
+
         return Response(user_data, status=status.HTTP_200_OK)
