@@ -15,9 +15,9 @@ class College(models.Model):
 
 
 class WaitingListEntry(models.Model):
-    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE) 
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
     college = models.ForeignKey(College, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.college.name} - {self.email}"
+        return f"{self.college.name} - {self.user.email}"
