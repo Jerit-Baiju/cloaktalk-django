@@ -4,7 +4,6 @@ import jwt
 import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,10 +11,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import GoogleToken, User
+from accounts.utils import get_domain_from_email
+from base.models import College
 
 
 class GoogleLoginUrl(APIView):
-    def get(self, request):
+    def get(self, _request):
         request_url = requests.Request(
             "GET",
             "https://accounts.google.com/o/oauth2/v2/auth",
@@ -65,6 +66,30 @@ def refresh_access(refresh_token):
 
 
 class GoogleLogin(APIView):
+    def _generate_unique_username(self, email: str) -> str:
+        """Generate a unique username based on the email.
+
+        Try using the email as-is first (allowed by Django's default validators).
+        If taken, fall back to the local-part plus a numeric suffix.
+        """
+        base = email.strip()
+        if not User.objects.filter(username=base).exists():
+            return base[:150]
+
+        local = (email.split("@", 1)[0] or "user").strip(" .@+")
+        # Keep it reasonably short to allow room for a suffix
+        local = local[:30] if len(local) > 30 else local
+        if not local:
+            local = "user"
+        suffix = 1
+        while True:
+            candidate = f"{local}{suffix}"
+            if len(candidate) > 150:
+                candidate = candidate[:150]
+            if not User.objects.filter(username=candidate).exists():
+                return candidate
+            suffix += 1
+
     def post(self, request):
         code = request.data.get("code")
 
@@ -102,16 +127,26 @@ class GoogleLogin(APIView):
             google_access_token = token_data["access_token"]
             google_refresh_token = token_data.get("refresh_token", "")  # Handle case when refresh token is not provided
 
-            # Generate username based on email if not provided
-            username = email.split("@")[0]
+            # For personal Gmail addresses, create the user but mark them inactive,
+            # persist Google tokens and avatar (if available), then return the same error
+            # response the frontend expects.
+            domain = get_domain_from_email(email)
+            if domain.lower() in {"gmail.com", "googlemail.com"}:
+                # Lookup college without forcing creation (to avoid missing required fields)
+                college = College.objects.filter(domain=domain).first()
 
-            try:
-                user, created = User.objects.get_or_create(email=email)
-                if created:
-                    user.username = username
-                    user.first_name = given_name
-                    user.last_name = family_name
-                    user.save()
+                # Find or create the user explicitly to avoid IntegrityErrors
+                user = User.objects.filter(email=email).first()
+                if not user:
+                    username = self._generate_unique_username(email)
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        first_name=given_name,
+                        last_name=family_name,
+                        is_active=False,  # personal gmail users inactive by default
+                        college=college,
+                    )
 
                     # Attempt to download the user's avatar if available
                     if picture_url:
@@ -122,8 +157,42 @@ class GoogleLogin(APIView):
                         except requests.exceptions.RequestException as e:
                             print(f"Error downloading avatar: {e}")
 
-            except IntegrityError:
-                user = User.objects.get(email=email)
+                # Update GoogleToken with access and refresh tokens even for inactive users
+                google_token, _ = GoogleToken.objects.get_or_create(user=user)
+                google_token.access_token = google_access_token
+                google_token.refresh_token = google_refresh_token
+                google_token.save()
+
+                return Response(
+                    {
+                        "error": "only_organization_email_allowed",
+                        "detail": "Only organization email IDs are allowed. Please sign in with your college or company email.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Organization or non-gmail domain: ensure active user creation
+            college = College.objects.filter(domain=domain).first()
+
+            user = User.objects.filter(email=email).first()
+            if not user:
+                username = self._generate_unique_username(email)
+                user = User.objects.create(
+                    email=email,
+                    username=username,
+                    first_name=given_name,
+                    last_name=family_name,
+                    college=college,
+                )
+
+                # Attempt to download the user's avatar if available
+                if picture_url:
+                    try:
+                        response = requests.get(picture_url, timeout=10)
+                        if response.status_code == 200:
+                            user.avatar.save(f"{email}.png", ContentFile(response.content), save=True)
+                    except requests.exceptions.RequestException as e:
+                        print(f"Error downloading avatar: {e}")
 
             # Update GoogleToken with access and refresh tokens
             google_token, _ = GoogleToken.objects.get_or_create(user=user)
