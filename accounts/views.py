@@ -134,6 +134,16 @@ class GoogleLogin(APIView):
             if domain.lower() in {"gmail.com", "googlemail.com"}:
                 # Lookup college without forcing creation (to avoid missing required fields)
                 college = College.objects.filter(domain=domain).first()
+                
+                # If no college exists for gmail domain, create one with is_active=False
+                if not college:
+                    college = College.objects.create(
+                        name="Gmail Users",
+                        domain=domain,
+                        window_start='20:00:00',  # Default 8 PM
+                        window_end='21:00:00',    # Default 9 PM
+                        is_active=False           # Gmail colleges start inactive
+                    )
 
                 # Find or create the user explicitly to avoid IntegrityErrors
                 user = User.objects.filter(email=email).first()
@@ -173,6 +183,23 @@ class GoogleLogin(APIView):
 
             # Organization or non-gmail domain: ensure active user creation
             college = College.objects.filter(domain=domain).first()
+            
+            # If no college exists for this domain, create one with is_active=False
+            if not college:
+                # Extract a readable college name from domain
+                college_name = domain.replace('.', ' ').title()
+                if college_name.endswith(' Edu'):
+                    college_name = college_name[:-4] + ' University'
+                elif college_name.endswith(' Ac In'):
+                    college_name = college_name[:-6] + ' College'
+                
+                college = College.objects.create(
+                    name=college_name,
+                    domain=domain,
+                    window_start='20:00:00',  # Default 8 PM
+                    window_end='21:00:00',    # Default 9 PM
+                    is_active=False           # New colleges start inactive
+                )
 
             user = User.objects.filter(email=email).first()
             if not user:
@@ -214,6 +241,14 @@ class GoogleLogin(APIView):
                 "profile_picture": user.avatar.url if user.avatar else None,
                 "is_active": user.is_active,
                 "date_joined": user.date_joined.isoformat(),
+                "college": {
+                    "id": user.college.id,
+                    "name": user.college.name,
+                    "domain": user.college.domain,
+                    "is_active": user.college.is_active,
+                    "window_start": user.college.window_start.strftime('%H:%M:%S'),
+                    "window_end": user.college.window_end.strftime('%H:%M:%S')
+                } if user.college else None
             }
 
             return Response(
@@ -239,6 +274,33 @@ class UserView(APIView):
         Get current user data for token validation and user info retrieval
         """
         user = request.user
+        
+        # Ensure user has a college - fix for legacy users who might not have one
+        if not user.college:
+            domain = get_domain_from_email(user.email)
+            college = College.objects.filter(domain=domain).first()
+            
+            if not college:
+                # Extract a readable college name from domain
+                college_name = domain.replace('.', ' ').title()
+                if college_name.endswith(' Edu'):
+                    college_name = college_name[:-4] + ' University'
+                elif college_name.endswith(' Ac In'):
+                    college_name = college_name[:-6] + ' College'
+                elif domain.lower() in {"gmail.com", "googlemail.com"}:
+                    college_name = "Gmail Users"
+                
+                college = College.objects.create(
+                    name=college_name,
+                    domain=domain,
+                    window_start='20:00:00',  # Default 8 PM
+                    window_end='21:00:00',    # Default 9 PM
+                    is_active=False           # New colleges start inactive
+                )
+            
+            # Assign college to user
+            user.college = college
+            user.save()
 
         # Format user data to match frontend expectations
         user_data = {
@@ -249,6 +311,14 @@ class UserView(APIView):
             "profile_picture": user.avatar.url if user.avatar else None,
             "is_active": user.is_active,
             "date_joined": user.date_joined.isoformat(),
+            "college": {
+                "id": user.college.id,
+                "name": user.college.name,
+                "domain": user.college.domain,
+                "is_active": user.college.is_active,
+                "window_start": user.college.window_start.strftime('%H:%M:%S'),
+                "window_end": user.college.window_end.strftime('%H:%M:%S')
+            } if user.college else None
         }
 
         return Response(user_data, status=status.HTTP_200_OK)
