@@ -15,7 +15,7 @@ class College(models.Model):
 
 
 class WaitingListEntry(models.Model):
-    email = models.EmailField(unique=True)
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE) 
     college = models.ForeignKey(College, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
