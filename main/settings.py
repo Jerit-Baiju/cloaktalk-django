@@ -18,13 +18,14 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "api.cloaktalk.fun"]
 
 # CORS settings for development
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://api.cloaktalk.fun",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -164,8 +165,4 @@ ASGI_APPLICATION = "main.asgi.application"
 
 # Channel layer configuration (using in-memory for development)
 # For production, consider using Redis: https://channels.readthedocs.io/en/stable/topics/channel_layers.html
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
-    }
-}
+CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
