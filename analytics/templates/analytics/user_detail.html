@@ -1,0 +1,189 @@
+{% extends 'analytics/base.html' %}
+
+{% block title %}{{ user.display_name }} - CloakTalk Analytics{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb">
+    <a href="{% url 'analytics:dashboard' %}">Dashboard</a> /
+    <a href="{% url 'analytics:users_list' %}">Users</a> /
+    {{ user.display_name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1rem; color: #667eea;">User Profile</h2>
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
+        <div>
+            {% if user.avatar %}
+                <img src="{{ user.avatar.url }}" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem;">
+            {% else %}
+                <div style="width: 100px; height: 100px; border-radius: 50%; background: #667eea; display: flex; align-items: center; justify-content: center; color: white; font-size: 2rem; margin-bottom: 1rem;">
+                    {{ user.display_name.0|upper }}
+                </div>
+            {% endif %}
+        </div>
+        <div>
+            <table style="box-shadow: none;">
+                <tr>
+                    <td><strong>Name:</strong></td>
+                    <td>{{ user.display_name }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Email:</strong></td>
+                    <td>{{ user.email }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Username:</strong></td>
+                    <td>@{{ user.username }}</td>
+                </tr>
+                <tr>
+                    <td><strong>College:</strong></td>
+                    <td>{{ user.college.name|default:"Not assigned" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Verified:</strong></td>
+                    <td>
+                        {% if user.is_verified %}
+                            <span class="badge">Verified</span>
+                        {% else %}
+                            <span class="badge unverified">Unverified</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Joined:</strong></td>
+                    <td>{{ user.created_at|date:"F d, Y H:i" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Last Updated:</strong></td>
+                    <td>{{ user.updated_at|date:"F d, Y H:i" }}</td>
+                </tr>
+                {% if user.bio %}
+                <tr>
+                    <td><strong>Bio:</strong></td>
+                    <td>{{ user.bio }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <span class="stat-number">{{ user_stats.total_chats }}</span>
+        <div class="stat-label">Total Chats</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ user_stats.total_messages_sent }}</span>
+        <div class="stat-label">Messages Sent</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ user_stats.active_chats }}</span>
+        <div class="stat-label">Active Chats</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ user_stats.colleges_participated }}</span>
+        <div class="stat-label">Colleges Participated</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="controls">
+        <h2 style="margin: 0; color: #667eea;">User's Chats ({{ total_chats }})</h2>
+
+        <div class="sort-controls">
+            <form method="GET" id="sortForm">
+                <select name="sort" onchange="document.getElementById('sortForm').submit()">
+                    <option value="latest_message" {% if current_sort == 'latest_message' %}selected{% endif %}>Latest Message</option>
+                    <option value="created_at" {% if current_sort == 'created_at' %}selected{% endif %}>Created Date</option>
+                    <option value="message_count" {% if current_sort == 'message_count' %}selected{% endif %}>Message Count</option>
+                    <option value="college" {% if current_sort == 'college' %}selected{% endif %}>College</option>
+                </select>
+                <select name="order" onchange="document.getElementById('sortForm').submit()">
+                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Descending</option>
+                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Ascending</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Chat Partner</th>
+                <th>College</th>
+                <th>Messages</th>
+                <th>Status</th>
+                <th>Latest Message</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for chat in chats %}
+            <tr>
+                <td>
+                    {% if chat.participant1.pk == user.pk %}
+                        <a href="{% url 'analytics:user_detail' chat.participant2.pk %}">
+                            {{ chat.participant2.display_name }}
+                        </a>
+                        <div style="font-size: 0.8rem; color: #666;">{{ chat.participant2.email }}</div>
+                    {% else %}
+                        <a href="{% url 'analytics:user_detail' chat.participant1.pk %}">
+                            {{ chat.participant1.display_name }}
+                        </a>
+                        <div style="font-size: 0.8rem; color: #666;">{{ chat.participant1.email }}</div>
+                    {% endif %}
+                </td>
+                <td>{{ chat.college.name }}</td>
+                <td>
+                    <span class="stat-number" style="font-size: 1.2rem;">{{ chat.message_count }}</span>
+                </td>
+                <td>
+                    {% if chat.is_active %}
+                        <span class="badge">Active</span>
+                    {% else %}
+                        <span class="badge inactive">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if chat.latest_message %}
+                        {{ chat.latest_message|date:"M d, Y H:i" }}
+                    {% else %}
+                        <span style="color: #666;">No messages</span>
+                    {% endif %}
+                </td>
+                <td>{{ chat.created_at|date:"M d, Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'analytics:chat_detail' chat.pk %}" class="btn btn-sm">View Chat</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">No chats found for this user</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if chats.has_other_pages %}
+    <div class="pagination">
+        {% if chats.has_previous %}
+            <a href="?page=1&sort={{ current_sort }}&order={{ current_order }}">First</a>
+            <a href="?page={{ chats.previous_page_number }}&sort={{ current_sort }}&order={{ current_order }}">Previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ chats.number }} of {{ chats.paginator.num_pages }}
+        </span>
+
+        {% if chats.has_next %}
+            <a href="?page={{ chats.next_page_number }}&sort={{ current_sort }}&order={{ current_order }}">Next</a>
+            <a href="?page={{ chats.paginator.num_pages }}&sort={{ current_sort }}&order={{ current_order }}">Last</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

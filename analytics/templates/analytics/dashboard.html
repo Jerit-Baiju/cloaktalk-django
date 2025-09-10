@@ -1,0 +1,130 @@
+{% extends 'analytics/base.html' %} {% block title %}Dashboard - CloakTalk Analytics{% endblock %} {% block content %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <span class="stat-number">{{ total_users }}</span>
+    <div class="stat-label">Total Users</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number">{{ verified_users }}</span>
+    <div class="stat-label">Verified Users</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number">{{ total_chats }}</span>
+    <div class="stat-label">Total Chats</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number">{{ active_chats }}</span>
+    <div class="stat-label">Active Chats</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number">{{ total_messages }}</span>
+    <div class="stat-label">Total Messages</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem">
+  <div class="card">
+    <h2 style="margin-bottom: 1rem; color: #667eea">Recent Users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>College</th>
+          <th>Verified</th>
+          <th>Joined</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in recent_users %}
+        <tr>
+          <td>
+            <a href="{% url 'analytics:user_detail' user.pk %}">{{ user.display_name }}</a>
+            <div style="font-size: 0.8rem; color: #666">{{ user.email }}</div>
+          </td>
+          <td>{{ user.college.name|default:"N/A" }}</td>
+          <td>
+            {% if user.is_verified %}
+            <span class="badge">Verified</span>
+            {% else %}
+            <span class="badge unverified">Unverified</span>
+            {% endif %}
+          </td>
+          <td>{{ user.created_at|date:"M d, Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No users found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top: 1rem">
+      <a href="{% url 'analytics:users_list' %}" class="btn btn-sm">View All Users</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom: 1rem; color: #667eea">Recent Chats</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Participants</th>
+          <th>College</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for chat in recent_chats %}
+        <tr>
+          <td>
+            <a href="{% url 'analytics:chat_detail' chat.pk %}">
+              {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}
+            </a>
+          </td>
+          <td>{{ chat.college.name }}</td>
+          <td>
+            {% if chat.is_active %}
+            <span class="badge">Active</span>
+            {% else %}
+            <span class="badge inactive">Inactive</span>
+            {% endif %}
+          </td>
+          <td>{{ chat.created_at|date:"M d, Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No chats found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 2rem">
+  <h2 style="margin-bottom: 1rem; color: #667eea">Top Colleges by Chat Activity</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>College</th>
+        <th>Total Chats</th>
+        <th>Percentage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for college in top_colleges %}
+      <tr>
+        <td>{{ college.college__name }}</td>
+        <td>{{ college.chat_count }}</td>
+        <td>{% widthratio college.chat_count total_chats 100 %}%</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3">No data available</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
