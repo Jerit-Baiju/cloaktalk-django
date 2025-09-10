@@ -2,6 +2,7 @@ import os
 
 import jwt
 import requests
+from datetime import datetime
 from django.conf import settings
 from django.core.files.base import ContentFile
 from rest_framework import status
@@ -49,6 +50,20 @@ def get_auth_tokens(code, redirect_uri):
         timeout=10,
     )
     return response.json()
+
+
+def _format_time_field(t):
+    """Return a HH:MM:SS string for a time-like object or pass through a string.
+
+    This guards against database rows or in-memory instances where the field
+    might be a plain string instead of a datetime.time.
+    """
+    if isinstance(t, str):
+        return t
+    try:
+        return t.strftime('%H:%M:%S')
+    except Exception:
+        return str(t)
 
 
 def refresh_access(refresh_token):
@@ -140,8 +155,8 @@ class GoogleLogin(APIView):
                     college = College.objects.create(
                         name="Gmail Users",
                         domain=domain,
-                        window_start='20:00:00',  # Default 8 PM
-                        window_end='21:00:00',    # Default 9 PM
+                        window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
+                        window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),    # Default 9 PM
                         is_active=False           # Gmail colleges start inactive
                     )
 
@@ -196,8 +211,8 @@ class GoogleLogin(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start='20:00:00',  # Default 8 PM
-                    window_end='21:00:00',    # Default 9 PM
+                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
+                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),    # Default 9 PM
                     is_active=False           # New colleges start inactive
                 )
 
@@ -246,8 +261,8 @@ class GoogleLogin(APIView):
                     "name": user.college.name,
                     "domain": user.college.domain,
                     "is_active": user.college.is_active,
-                    "window_start": user.college.window_start.strftime('%H:%M:%S'),
-                    "window_end": user.college.window_end.strftime('%H:%M:%S')
+                    "window_start": _format_time_field(user.college.window_start),
+                    "window_end": _format_time_field(user.college.window_end),
                 } if user.college else None
             }
 
@@ -293,8 +308,8 @@ class UserView(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start='20:00:00',  # Default 8 PM
-                    window_end='21:00:00',    # Default 9 PM
+                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
+                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),    # Default 9 PM
                     is_active=False           # New colleges start inactive
                 )
             
@@ -316,8 +331,8 @@ class UserView(APIView):
                 "name": user.college.name,
                 "domain": user.college.domain,
                 "is_active": user.college.is_active,
-                "window_start": user.college.window_start.strftime('%H:%M:%S'),
-                "window_end": user.college.window_end.strftime('%H:%M:%S')
+                "window_start": _format_time_field(user.college.window_start),
+                "window_end": _format_time_field(user.college.window_end),
             } if user.college else None
         }
 

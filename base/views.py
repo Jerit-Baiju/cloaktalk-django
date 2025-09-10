@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Any
 
 from django.utils import timezone
 from rest_framework import status
@@ -7,6 +8,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from base.models import College
+
+
+def _format_time_field(t: Any) -> str:
+    """Return a HH:MM:SS string for a time-like object or pass through a string."""
+    if isinstance(t, str):
+        return t
+    try:
+        return t.strftime('%H:%M:%S')
+    except Exception:
+        return str(t)
 
 
 class CollegeAccessView(APIView):
@@ -54,8 +65,8 @@ class CollegeAccessView(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start="20:00:00",  # Default 8 PM
-                    window_end="21:00:00",  # Default 9 PM
+                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
+                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
@@ -103,8 +114,8 @@ class CollegeAccessView(APIView):
                     "reason": "outside_window",
                     "message": f'Access is only available between {college.window_start.strftime("%H:%M")} and {college.window_end.strftime("%H:%M")}',
                     "college_name": college.name,
-                    "window_start": college.window_start.strftime("%H:%M:%S"),
-                    "window_end": college.window_end.strftime("%H:%M:%S"),
+                    "window_start": _format_time_field(college.window_start),
+                    "window_end": _format_time_field(college.window_end),
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -115,8 +126,8 @@ class CollegeAccessView(APIView):
                 "can_access": True,
                 "message": "Access granted",
                 "college_name": college.name,
-                "window_start": college.window_start.strftime("%H:%M:%S"),
-                "window_end": college.window_end.strftime("%H:%M:%S"),
+                "window_start": _format_time_field(college.window_start),
+                "window_end": _format_time_field(college.window_end),
                 "time_remaining_seconds": self._calculate_time_remaining(current_time, college.window_end),
             },
             status=status.HTTP_200_OK,
@@ -173,8 +184,8 @@ class CollegeStatusView(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start="20:00:00",  # Default 8 PM
-                    window_end="21:00:00",  # Default 9 PM
+                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
+                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
