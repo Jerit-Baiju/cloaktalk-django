@@ -47,10 +47,27 @@ class QueueConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         
+        # Also join user-specific group for direct messages
+        self.user_group_name = f"user_{self.user.id}"
+        await self.channel_layer.group_add(
+            self.user_group_name,
+            self.channel_name
+        )
+        
         await self.accept()
         
         # Send initial queue status
         await self.send_queue_status()
+        
+        # Broadcast user presence update
+        await self.channel_layer.group_send(
+            self.college_group_name,
+            {
+                'type': 'user_presence_update',
+                'user_id': str(self.user.id),
+                'status': 'online'
+            }
+        )
     
     async def get_user_from_token(self):
         """Extract and validate JWT token from query parameters."""
@@ -90,6 +107,22 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 self.college_group_name,
                 self.channel_name
             )
+            
+            # Broadcast user presence update
+            await self.channel_layer.group_send(
+                self.college_group_name,
+                {
+                    'type': 'user_presence_update',
+                    'user_id': str(self.user.id) if self.user else None,
+                    'status': 'offline'
+                }
+            )
+        
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
     
     async def receive(self, text_data=None, bytes_data=None):
         """Handle incoming WebSocket messages."""
@@ -103,6 +136,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 await self.leave_queue()
             elif action == 'check_status':
                 await self.send_queue_status()
+            elif action == 'heartbeat':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
                 
         except json.JSONDecodeError:
             await self.send(text_data=json.dumps({
@@ -217,6 +252,16 @@ class QueueConsumer(AsyncWebsocketConsumer):
             'chat_id': event['chat_id'],
             'message': 'Match found! Redirecting to chat...'
         }))
+    
+    async def user_presence_update(self, event):
+        """Handle user presence updates."""
+        # Only send presence updates to other users (not the user themselves)
+        if event.get('user_id') != str(self.user.id):
+            await self.send(text_data=json.dumps({
+                'type': 'user_presence_update',
+                'user_id': event['user_id'],
+                'status': event['status']
+            }))
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -314,6 +359,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     await self.save_and_send_message(content)
             elif action == 'end_chat':
                 await self.end_chat()
+            elif action == 'typing_start':
+                await self.broadcast_typing(True)
+            elif action == 'typing_stop':
+                await self.broadcast_typing(False)
+            elif action == 'heartbeat':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
                 
         except json.JSONDecodeError:
             await self.send(text_data=json.dumps({
@@ -356,6 +407,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
     
+    async def broadcast_typing(self, is_typing):
+        """Broadcast typing indicator to other participants."""
+        event_type = 'typing_start' if is_typing else 'typing_stop'
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': event_type,
+                'user_id': str(self.user.id)
+            }
+        )
+    
     async def send_recent_messages(self):
         """Send recent messages to the connected user."""
         messages = await database_sync_to_async(list)(
@@ -395,3 +457,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'type': 'chat_ended',
             'message': event['message']
         }))
+    
+    async def typing_start(self, event):
+        """Handle typing start events."""
+        # Only send to other users, not the one who started typing
+        if event['user_id'] != str(self.user.id):
+            await self.send(text_data=json.dumps({
+                'type': 'typing_start',
+                'user_id': event['user_id']
+            }))
+    
+    async def typing_stop(self, event):
+        """Handle typing stop events."""
+        # Only send to other users, not the one who stopped typing
+        if event['user_id'] != str(self.user.id):
+            await self.send(text_data=json.dumps({
+                'type': 'typing_stop',
+                'user_id': event['user_id']
+            }))
