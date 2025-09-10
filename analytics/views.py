@@ -3,7 +3,7 @@ from datetime import datetime
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import Count, Max, Q
+from django.db.models import Count, F, Max, Q
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -185,5 +185,65 @@ def chat_reader(request):
             "messages": messages,
             "next_chat": next_chat,
             "prev_chat": prev_chat,
+        },
+    )
+
+
+@staff_member_required
+def users_list(request):
+    """List users with basic stats and search/sort."""
+    q = request.GET.get("q")
+    sort = request.GET.get("sort", "-created_at")
+
+    users = (
+        User.objects.select_related("college")
+        .annotate(
+            c1=Count("chats_as_participant1", distinct=True),
+            c2=Count("chats_as_participant2", distinct=True),
+            messages_sent=Count("message", distinct=True),
+        )
+        .annotate(chats_count=F("c1") + F("c2"))
+    )
+
+    if q:
+        users = users.filter(Q(name__icontains=q) | Q(email__icontains=q) | Q(username__icontains=q))
+
+    allowed_sorts = {"created_at", "-created_at", "chats_count", "-chats_count", "messages_sent", "-messages_sent", "name", "-name"}
+    if sort not in allowed_sorts:
+        sort = "-created_at"
+    users = users.order_by(sort)
+
+    paginator = Paginator(users, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "analytics/users_list.html", {"page_obj": page_obj, "sort": sort, "q": q})
+
+
+@staff_member_required
+def user_detail(request, user_id: int):
+    """Detailed view for a single user including first_name and recent chats."""
+    user = get_object_or_404(
+        User.objects.select_related("college")
+        .annotate(
+            c1=Count("chats_as_participant1", distinct=True),
+            c2=Count("chats_as_participant2", distinct=True),
+            messages_sent=Count("message", distinct=True),
+        )
+        .annotate(chats_count=F("c1") + F("c2")),
+        pk=user_id,
+    )
+
+    recent_chats = (
+        Chat.objects.filter(Q(participant1=user) | Q(participant2=user))
+        .select_related("participant1", "participant2", "college")
+        .annotate(last_msg_at=Max("messages__created_at"), msgs=Count("messages"))
+        .order_by("-last_msg_at")[:10]
+    )
+
+    return render(
+        request,
+        "analytics/user_detail.html",
+        {
+            "user_obj": user,
+            "recent_chats": recent_chats,
         },
     )

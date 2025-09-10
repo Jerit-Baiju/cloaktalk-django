@@ -14,5 +14,7 @@ urlpatterns = [
     path("chats/<uuid:chat_id>/", views.chat_detail, name="chat_detail"),
 
     # User focused views
+    path("users/", views.users_list, name="users_list"),
+    path("users/<int:user_id>/", views.user_detail, name="user_detail"),
     path("users/<int:user_id>/chats/", views.user_chats, name="user_chats"),
 ]

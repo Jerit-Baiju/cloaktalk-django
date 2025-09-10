@@ -1,0 +1,74 @@
+{% extends 'analytics/base_analytics.html' %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Users</h1>
+  <div class="text-sm text-gray-400">Sort: {{ sort }}</div>
+</div>
+
+<form method="get" class="mb-4">
+  <div class="flex gap-2">
+    <input name="q" value="{{ q }}" placeholder="Search name/email/username" class="w-full bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
+    <select name="sort" class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm">
+      <option value="-created_at" {% if sort == '-created_at' %}selected{% endif %}>Newest</option>
+      <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Oldest</option>
+      <option value="-chats_count" {% if sort == '-chats_count' %}selected{% endif %}>Most Chats</option>
+      <option value="chats_count" {% if sort == 'chats_count' %}selected{% endif %}>Fewest Chats</option>
+      <option value="-messages_sent" {% if sort == '-messages_sent' %}selected{% endif %}>Most Messages</option>
+      <option value="messages_sent" {% if sort == 'messages_sent' %}selected{% endif %}>Fewest Messages</option>
+      <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A-Z</option>
+      <option value="-name" {% if sort == '-name' %}selected{% endif %}>Name Z-A</option>
+    </select>
+    <button class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">Apply</button>
+  </div>
+</form>
+
+<div class="glass rounded-xl overflow-hidden">
+  <table class="min-w-full text-sm">
+    <thead class="bg-white/5 text-gray-300">
+      <tr>
+        <th class="px-4 py-3 text-left">User</th>
+        <th class="px-4 py-3 text-left">College</th>
+        <th class="px-4 py-3 text-center">Chats</th>
+        <th class="px-4 py-3 text-center">Messages</th>
+        <th class="px-4 py-3 text-left">Joined</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-white/5">
+      {% for u in page_obj.object_list %}
+      <tr class="hover:bg-white/5">
+        <td class="px-4 py-3">
+          <div class="font-medium">
+            <a class="hover:underline" href="{% url 'analytics:user_detail' u.id %}">{{ u.display_name }}</a>
+          </div>
+          <div class="text-xs text-gray-400">{{ u.email }}</div>
+        </td>
+        <td class="px-4 py-3 text-gray-300">{{ u.college.name }}</td>
+        <td class="px-4 py-3 text-center text-ctpink-400 font-semibold">{{ u.chats_count }}</td>
+        <td class="px-4 py-3 text-center text-ctpink-400 font-semibold">{{ u.messages_sent }}</td>
+        <td class="px-4 py-3 text-gray-300">{{ u.created_at }}</td>
+        <td class="px-4 py-3 text-right">
+          <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:user_chats' u.id %}">View Chats</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 py-6 text-center text-gray-500">No users</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="mt-4 flex items-center justify-between text-sm">
+  <div class="text-gray-400">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&sort={{ sort }}">Prev</a>
+    {% endif %} {% if page_obj.has_next %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="?page={{ page_obj.next_page_number }}&q={{ q }}&sort={{ sort }}">Next</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

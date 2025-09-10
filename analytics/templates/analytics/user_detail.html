@@ -1,0 +1,62 @@
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ user_obj.display_name }}</h1>
+    <div class="text-sm text-gray-400">Email: {{ user_obj.email }}</div>
+    <div class="text-sm text-gray-400">First name: {{ user_obj.first_name }}</div>
+    {% if user_obj.college %}
+    <div class="text-sm text-gray-400">College: {{ user_obj.college.name }}</div>
+    {% endif %}
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:user_chats' user_obj.id %}">All Chats</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Chats</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ user_obj.chats_count }}</div>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Messages Sent</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ user_obj.messages_sent }}</div>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Joined</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ user_obj.created_at }}</div>
+  </div>
+</div>
+
+<div class="mt-8 glass rounded-xl">
+  <div class="p-5 border-b border-white/10 flex items-center justify-between">
+    <h2 class="font-semibold">Recent Chats</h2>
+    <a class="text-ctpink-400 text-sm" href="{% url 'analytics:user_chats' user_obj.id %}">View all</a>
+  </div>
+  <div class="divide-y divide-white/5">
+    {% for chat in recent_chats %}
+    <div class="p-5 flex items-center justify-between">
+      <div>
+        {% if chat.participant1_id == user_obj.id %}
+        <div class="font-medium">
+          <a class="hover:underline" href="{% url 'analytics:chat_detail' chat.id %}">{{ chat.participant2.display_name }}</a>
+        </div>
+        <div class="text-xs text-gray-400">{{ chat.participant2.email }}</div>
+        {% else %}
+        <div class="font-medium">
+          <a class="hover:underline" href="{% url 'analytics:chat_detail' chat.id %}">{{ chat.participant1.display_name }}</a>
+        </div>
+        <div class="text-xs text-gray-400">{{ chat.participant1.email }}</div>
+        {% endif %}
+      </div>
+      <div class="text-right">
+        <div class="text-ctpink-400 font-semibold">{{ chat.msgs }}</div>
+        <div class="text-xs text-gray-400">Last: {{ chat.last_msg_at }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="p-6 text-gray-500">No recent chats</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
