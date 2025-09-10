@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -140,6 +141,21 @@ class QueueConsumer(AsyncWebsocketConsumer):
             # Notify college group about queue update
             await self.channel_layer.group_send(self.college_group_name, {"type": "queue_update", "action": "user_joined"})
 
+            # Get queue statistics for user feedback
+            queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+            
+            # Send enhanced queue status with matching info
+            await self.send(
+                text_data=json.dumps({
+                    "type": "queue_status", 
+                    "waiting_count": queue_stats['total_waiting'],
+                    "college": user_college.name, 
+                    "is_in_queue": True,
+                    "queue_stats": queue_stats,
+                    "message": self._get_queue_message(queue_stats)
+                })
+            )
+
             # Try to find a match
             await self.try_match()
         else:
@@ -150,6 +166,19 @@ class QueueConsumer(AsyncWebsocketConsumer):
                     {"type": "queue_status", "waiting_count": count, "college": user_college.name, "is_in_queue": True}
                 )
             )
+
+    def _get_queue_message(self, queue_stats):
+        """Generate user-friendly message based on queue statistics."""
+        if queue_stats['fresh_users'] >= 2:
+            return "Great! You'll be matched with someone new very soon."
+        elif queue_stats['fresh_users'] >= 1:
+            return "You'll be matched with someone who's new to the platform soon!"
+        elif queue_stats['ready_for_matching']:
+            return "Looking for someone you haven't chatted with before..."
+        elif queue_stats['total_waiting'] >= 2:
+            return "Finding the best match for you... This might take up to 5 seconds."
+        else:
+            return "Waiting for more users to join the queue..."
 
     async def leave_queue(self):
         """Remove user from waiting queue."""
@@ -174,11 +203,41 @@ class QueueConsumer(AsyncWebsocketConsumer):
 
             # Update queue for college group
             await self.channel_layer.group_send(self.college_group_name, {"type": "queue_update", "action": "match_created"})
+        else:
+            # No immediate match found, schedule a retry after 5 seconds for potential matches
+            await self.schedule_delayed_match(user_college)
+
+    async def schedule_delayed_match(self, college):
+        """Schedule a delayed match attempt for users who might be ready after waiting 5 seconds."""
+        async def delayed_match():
+            await asyncio.sleep(6)  # Wait 6 seconds to ensure 5+ second wait time has passed
+            
+            # Try matching again - this time users who have waited 5+ seconds should be eligible
+            chat = await database_sync_to_async(MatchingService.try_match_users)(college)
+            
+            if chat:
+                # Notify both participants about the match
+                participants = await database_sync_to_async(chat.get_participants)()
+                for participant in participants:
+                    await self.channel_layer.group_send(
+                        f"user_{participant.id}", {"type": "chat_matched", "chat_id": str(chat.id)}
+                    )
+                
+                # Update queue for college group
+                await self.channel_layer.group_send(
+                    f"college_{college.id}", {"type": "queue_update", "action": "match_created"}
+                )
+        
+        # Create the delayed task
+        asyncio.create_task(delayed_match())
 
     async def send_queue_status(self):
         """Send current queue status to user."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
-        count = await database_sync_to_async(MatchingService.get_waiting_count)(user_college)
+        
+        # Get enhanced queue statistics
+        queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+        
         # Determine if current user is already queued
         from base.models import WaitingListEntry
 
@@ -187,9 +246,14 @@ class QueueConsumer(AsyncWebsocketConsumer):
         )()
 
         await self.send(
-            text_data=json.dumps(
-                {"type": "queue_status", "waiting_count": count, "college": user_college.name, "is_in_queue": is_in_queue}
-            )
+            text_data=json.dumps({
+                "type": "queue_status", 
+                "waiting_count": queue_stats['total_waiting'],
+                "college": user_college.name, 
+                "is_in_queue": is_in_queue,
+                "queue_stats": queue_stats,
+                "message": self._get_queue_message(queue_stats) if is_in_queue else "Join the queue to start chatting!"
+            })
         )
 
     async def queue_update(self, _event):
