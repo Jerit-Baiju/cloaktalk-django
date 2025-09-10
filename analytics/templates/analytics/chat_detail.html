@@ -1,158 +1,76 @@
-{% extends 'analytics/base.html' %}
-
-{% block title %}Chat: {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }} - CloakTalk Analytics{% endblock %}
-
-{% block breadcrumb %}
-<div class="breadcrumb">
-    <a href="{% url 'analytics:dashboard' %}">Dashboard</a> /
-    <a href="{% url 'analytics:users_list' %}">Users</a> /
-    Chat Details
-</div>
-{% endblock %}
-
-{% block content %}
-<div class="card">
-    <h2 style="margin-bottom: 1rem; color: #667eea;">Chat Information</h2>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-        <div>
-            <table style="box-shadow: none;">
-                <tr>
-                    <td><strong>Chat ID:</strong></td>
-                    <td>{{ chat.id }}</td>
-                </tr>
-                <tr>
-                    <td><strong>College:</strong></td>
-                    <td>{{ chat.college.name }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Status:</strong></td>
-                    <td>
-                        {% if chat.is_active %}
-                            <span class="badge">Active</span>
-                        {% else %}
-                            <span class="badge inactive">Inactive</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td><strong>Created:</strong></td>
-                    <td>{{ chat.created_at|date:"F d, Y H:i" }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Duration:</strong></td>
-                    <td>{{ chat_stats.chat_duration }}</td>
-                </tr>
-            </table>
-        </div>
-        <div>
-            <h3 style="margin-bottom: 1rem; color: #667eea;">Participants</h3>
-            <div style="display: flex; gap: 2rem;">
-                <div>
-                    <h4>
-                        <a href="{% url 'analytics:user_detail' chat.participant1.pk %}">
-                            {{ chat.participant1.display_name }}
-                        </a>
-                    </h4>
-                    <p style="font-size: 0.9rem; color: #666;">{{ chat.participant1.email }}</p>
-                    <p style="font-size: 0.9rem;">Messages: <strong>{{ chat_stats.participant1_messages }}</strong></p>
-                </div>
-                <div style="display: flex; align-items: center; color: #667eea; font-size: 1.5rem;">↔</div>
-                <div>
-                    <h4>
-                        <a href="{% url 'analytics:user_detail' chat.participant2.pk %}">
-                            {{ chat.participant2.display_name }}
-                        </a>
-                    </h4>
-                    <p style="font-size: 0.9rem; color: #666;">{{ chat.participant2.email }}</p>
-                    <p style="font-size: 0.9rem;">Messages: <strong>{{ chat_stats.participant2_messages }}</strong></p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <span class="stat-number">{{ chat_stats.total_messages }}</span>
-        <div class="stat-label">Total Messages</div>
-    </div>
-    <div class="stat-card">
-        <span class="stat-number">{{ chat_stats.participant1_messages }}</span>
-        <div class="stat-label">{{ chat.participant1.display_name }}</div>
-    </div>
-    <div class="stat-card">
-        <span class="stat-number">{{ chat_stats.participant2_messages }}</span>
-        <div class="stat-label">{{ chat.participant2.display_name }}</div>
-    </div>
-    <div class="stat-card">
-        <span class="stat-number">{{ chat_stats.system_messages }}</span>
-        <div class="stat-label">System Messages</div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="controls">
-        <h2 style="margin: 0; color: #667eea;">Messages ({{ chat_stats.total_messages }})</h2>
-
-        <div class="sort-controls">
-            <form method="GET" id="sortForm">
-                <select name="sort" onchange="document.getElementById('sortForm').submit()">
-                    <option value="created_at" {% if current_sort == 'created_at' %}selected{% endif %}>Timestamp</option>
-                </select>
-                <select name="order" onchange="document.getElementById('sortForm').submit()">
-                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Oldest First</option>
-                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Newest First</option>
-                </select>
-            </form>
-        </div>
-    </div>
-
-    <div style="max-height: 600px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 1rem;">
-        {% for message in messages %}
-        <div style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 8px; {% if message.message_type == 'system' %}background: #f8f9fa; border-left: 4px solid #6c757d;{% elif message.sender == chat.participant1 %}background: #e3f2fd; border-left: 4px solid #2196f3;{% else %}background: #f3e5f5; border-left: 4px solid #9c27b0;{% endif %}">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                <div style="font-weight: 600; {% if message.message_type == 'system' %}color: #6c757d; font-style: italic;{% elif message.sender == chat.participant1 %}color: #1976d2;{% else %}color: #7b1fa2;{% endif %}">
-                    {% if message.message_type == 'system' %}
-                        System
-                    {% else %}
-                        {% if message.sender == chat.participant1 %}
-                            {{ chat.participant1.display_name }}
-                        {% else %}
-                            {{ chat.participant2.display_name }}
-                        {% endif %}
-                    {% endif %}
-                </div>
-                <div style="font-size: 0.8rem; color: #666;">
-                    {{ message.created_at|date:"M d, Y H:i:s" }}
-                </div>
-            </div>
-            <div style="{% if message.message_type == 'system' %}font-style: italic;{% endif %}">
-                {{ message.content|linebreaks }}
-            </div>
-        </div>
-        {% empty %}
-        <div style="text-align: center; color: #666; padding: 2rem;">
-            No messages in this chat
-        </div>
-        {% endfor %}
-    </div>
-
-    {% if messages.has_other_pages %}
-    <div class="pagination">
-        {% if messages.has_previous %}
-            <a href="?page=1&sort={{ current_sort }}&order={{ current_order }}">First</a>
-            <a href="?page={{ messages.previous_page_number }}&sort={{ current_sort }}&order={{ current_order }}">Previous</a>
-        {% endif %}
-
-        <span class="current">
-            Page {{ messages.number }} of {{ messages.paginator.num_pages }}
-        </span>
-
-        {% if messages.has_next %}
-            <a href="?page={{ messages.next_page_number }}&sort={{ current_sort }}&order={{ current_order }}">Next</a>
-            <a href="?page={{ messages.paginator.num_pages }}&sort={{ current_sort }}&order={{ current_order }}">Last</a>
-        {% endif %}
-    </div>
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-xl font-semibold">Chat Detail</h1>
+    <div class="text-sm text-gray-400">{{ chat.college.name }} · {{ chat.created_at }}</div>
+  </div>
+  <div class="flex items-center gap-2">
+    {% if prev_chat %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_detail' prev_chat.id %}">Prev chat</a>
+    {% endif %} {% if next_chat %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_detail' next_chat.id %}">Next chat</a>
     {% endif %}
+    <a
+      class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
+      href="{% url 'analytics:chat_detail' chat.id %}?swap={% if not swap %}1{% else %}0{% endif %}"
+      >Swap sides</a
+    >
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}"
+      >Open in Reader</a
+    >
+  </div>
+</div>
+
+<!-- Participants -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="glass rounded-xl p-4">
+    <div class="text-xs text-gray-400">User A</div>
+    <div class="text-lg font-semibold">
+      {% if not swap %}{{ chat.participant1.display_name }}{% else %}{{ chat.participant2.display_name }}{% endif %}
+    </div>
+    <div class="text-xs text-gray-400">
+      {% if not swap %}{{ chat.participant1.email }}{% else %}{{ chat.participant2.email }}{% endif %}
+    </div>
+  </div>
+  <div class="glass rounded-xl p-4">
+    <div class="text-xs text-gray-400">User B</div>
+    <div class="text-lg font-semibold">
+      {% if not swap %}{{ chat.participant2.display_name }}{% else %}{{ chat.participant1.display_name }}{% endif %}
+    </div>
+    <div class="text-xs text-gray-400">
+      {% if not swap %}{{ chat.participant2.email }}{% else %}{{ chat.participant1.email }}{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="glass rounded-xl p-4">
+  <div class="space-y-4">
+    {% for m in messages %} {% if (not swap and m.sender_id == chat.participant1_id) or (swap and m.sender_id == chat.participant2_id)
+    %}
+    <!-- Left bubble -->
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs">A</div>
+      <div>
+        <div class="text-xs text-gray-400">
+          {% if m.sender %}{{ m.sender.display_name }}{% else %}System{% endif %} · {{ m.created_at }}
+        </div>
+        <div class="mt-1 max-w-xl bg-white/5 border border-white/10 rounded-lg px-4 py-2">{{ m.content }}</div>
+      </div>
+    </div>
+    {% else %}
+    <!-- Right bubble -->
+    <div class="flex items-start gap-3 justify-end">
+      <div>
+        <div class="text-right text-xs text-gray-400">
+          {% if m.sender %}{{ m.sender.display_name }}{% else %}System{% endif %} · {{ m.created_at }}
+        </div>
+        <div class="mt-1 max-w-xl bg-ctpink-500/10 border border-ctpink-500/30 rounded-lg px-4 py-2">{{ m.content }}</div>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-ctpink-500/20 flex items-center justify-center text-xs">B</div>
+    </div>
+    {% endif %} {% empty %}
+    <div class="text-gray-500">No messages</div>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}

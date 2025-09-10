@@ -1,130 +1,95 @@
-{% extends 'analytics/base.html' %} {% block title %}Dashboard - CloakTalk Analytics{% endblock %} {% block content %}
-<div class="stats-grid">
-  <div class="stat-card">
-    <span class="stat-number">{{ total_users }}</span>
-    <div class="stat-label">Total Users</div>
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+  <!-- KPIs -->
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Total Users</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.total_users }}</div>
   </div>
-  <div class="stat-card">
-    <span class="stat-number">{{ verified_users }}</span>
-    <div class="stat-label">Verified Users</div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Total Chats</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.total_chats }}</div>
   </div>
-  <div class="stat-card">
-    <span class="stat-number">{{ total_chats }}</span>
-    <div class="stat-label">Total Chats</div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Total Messages</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.total_messages }}</div>
   </div>
-  <div class="stat-card">
-    <span class="stat-number">{{ active_chats }}</span>
-    <div class="stat-label">Active Chats</div>
-  </div>
-  <div class="stat-card">
-    <span class="stat-number">{{ total_messages }}</span>
-    <div class="stat-label">Total Messages</div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Active Chats</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.active_chats }}</div>
   </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem">
-  <div class="card">
-    <h2 style="margin-bottom: 1rem; color: #667eea">Recent Users</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>College</th>
-          <th>Verified</th>
-          <th>Joined</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in recent_users %}
-        <tr>
-          <td>
-            <a href="{% url 'analytics:user_detail' user.pk %}">{{ user.display_name }}</a>
-            <div style="font-size: 0.8rem; color: #666">{{ user.email }}</div>
-          </td>
-          <td>{{ user.college.name|default:"N/A" }}</td>
-          <td>
-            {% if user.is_verified %}
-            <span class="badge">Verified</span>
-            {% else %}
-            <span class="badge unverified">Unverified</span>
-            {% endif %}
-          </td>
-          <td>{{ user.created_at|date:"M d, Y" }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="4">No users found</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <div style="margin-top: 1rem">
-      <a href="{% url 'analytics:users_list' %}" class="btn btn-sm">View All Users</a>
+<!-- Charts (simple textual trends for now) -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="glass rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold">Chats by Day</h2>
+      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:chats_list' %}">See all</a>
+    </div>
+    <div class="mt-4 space-y-2 text-sm">
+      {% for row in chats_by_day %}
+      <div class="flex justify-between text-gray-300">
+        <span>{{ row.day }}</span>
+        <span class="text-ctpink-400 font-medium">{{ row.c }}</span>
+      </div>
+      {% empty %}
+      <div class="text-gray-500">No data</div>
+      {% endfor %}
     </div>
   </div>
-
-  <div class="card">
-    <h2 style="margin-bottom: 1rem; color: #667eea">Recent Chats</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Participants</th>
-          <th>College</th>
-          <th>Status</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for chat in recent_chats %}
-        <tr>
-          <td>
-            <a href="{% url 'analytics:chat_detail' chat.pk %}">
-              {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}
-            </a>
-          </td>
-          <td>{{ chat.college.name }}</td>
-          <td>
-            {% if chat.is_active %}
-            <span class="badge">Active</span>
-            {% else %}
-            <span class="badge inactive">Inactive</span>
-            {% endif %}
-          </td>
-          <td>{{ chat.created_at|date:"M d, Y" }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="4">No chats found</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="glass rounded-xl p-5">
+    <h2 class="font-semibold">Chats by Month</h2>
+    <div class="mt-4 space-y-2 text-sm">
+      {% for row in chats_by_month %}
+      <div class="flex justify-between text-gray-300">
+        <span>{{ row.month|date:'Y-m' }}</span>
+        <span class="text-ctpink-400 font-medium">{{ row.c }}</span>
+      </div>
+      {% empty %}
+      <div class="text-gray-500">No data</div>
+      {% endfor %}
+    </div>
   </div>
 </div>
 
-<div class="card" style="margin-top: 2rem">
-  <h2 style="margin-bottom: 1rem; color: #667eea">Top Colleges by Chat Activity</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>College</th>
-        <th>Total Chats</th>
-        <th>Percentage</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for college in top_colleges %}
-      <tr>
-        <td>{{ college.college__name }}</td>
-        <td>{{ college.chat_count }}</td>
-        <td>{% widthratio college.chat_count total_chats 100 %}%</td>
-      </tr>
+<!-- Top Chats & Users -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="glass rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold">Top Chats by Messages</h2>
+      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:chats_list' %}?sort=-msgs">View</a>
+    </div>
+    <ul class="mt-4 divide-y divide-white/5">
+      {% for chat in chat_message_counts %}
+      <li class="py-3 flex items-center justify-between">
+        <div class="text-sm text-gray-300">
+          <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium hover:underline"
+            >{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a
+          >
+          <div class="text-xs text-gray-400">{{ chat.college.name }}</div>
+        </div>
+        <div class="text-ctpink-400 font-semibold">{{ chat.msgs }}</div>
+      </li>
       {% empty %}
-      <tr>
-        <td colspan="3">No data available</td>
-      </tr>
+      <li class="py-4 text-gray-500">No chats</li>
       {% endfor %}
-    </tbody>
-  </table>
+    </ul>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <h2 class="font-semibold">Top Users by Messages</h2>
+    <ul class="mt-4 divide-y divide-white/5">
+      {% for u in top_users %}
+      <li class="py-3 flex items-center justify-between">
+        <div class="text-sm text-gray-300">
+          <a href="{% url 'analytics:user_chats' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
+          <div class="text-xs text-gray-400">{{ u.email }}</div>
+        </div>
+        <div class="text-ctpink-400 font-semibold">{{ u.msgs }}</div>
+      </li>
+      {% empty %}
+      <li class="py-4 text-gray-500">No users</li>
+      {% endfor %}
+    </ul>
+  </div>
 </div>
 {% endblock %}

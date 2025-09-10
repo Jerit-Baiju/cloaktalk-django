@@ -1,209 +1,189 @@
+from datetime import datetime
+
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
-from django.shortcuts import render
-from django.utils.decorators import method_decorator
-from django.views.generic import DetailView, ListView
+from django.db.models.functions import TruncDate, TruncMonth
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
 
-from accounts.models import User
 from base.models import Chat, Message
 
-
-@method_decorator(staff_member_required, name="dispatch")
-class UsersListView(ListView):
-    """View to list all users with sorting and filtering options"""
-
-    model = User
-    template_name = "analytics/users_list.html"
-    context_object_name = "users"
-    paginate_by = 50
-
-    def get_queryset(self):
-        queryset = User.objects.annotate(
-            chat_count=Count("chats_as_participant1") + Count("chats_as_participant2"),
-            message_count=Count("message"),
-            latest_activity=Max("message__created_at"),
-        ).select_related("college")
-
-        # Get sorting parameter
-        sort_by = self.request.GET.get("sort", "created_at")
-        order = self.request.GET.get("order", "desc")
-
-        # Define sorting options
-        sort_options = {
-            "created_at": "created_at",
-            "username": "username",
-            "email": "email",
-            "first_name": "first_name",
-            "last_name": "last_name",
-            "chat_count": "chat_count",
-            "message_count": "message_count",
-            "latest_activity": "latest_activity",
-            "is_verified": "is_verified",
-        }
-
-        if sort_by in sort_options:
-            order_prefix = "-" if order == "desc" else ""
-            queryset = queryset.order_by(f"{order_prefix}{sort_options[sort_by]}")
-
-        # Search functionality
-        search = self.request.GET.get("search", "")
-        if search:
-            queryset = queryset.filter(
-                Q(username__icontains=search)
-                | Q(email__icontains=search)
-                | Q(name__icontains=search)
-                | Q(first_name__icontains=search)
-                | Q(last_name__icontains=search)
-            )
-
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["current_sort"] = self.request.GET.get("sort", "created_at")
-        context["current_order"] = self.request.GET.get("order", "desc")
-        context["search_query"] = self.request.GET.get("search", "")
-        context["total_users"] = User.objects.count()
-        context["verified_users"] = User.objects.filter(is_verified=True).count()
-        context["total_chats"] = Chat.objects.count()
-        context["total_messages"] = Message.objects.count()
-        return context
+User = get_user_model()
 
 
-@method_decorator(staff_member_required, name="dispatch")
-class UserDetailView(DetailView):
-    """View to show details of a specific user and their chats"""
-
-    model = User
-    template_name = "analytics/user_detail.html"
-    context_object_name = "user"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.get_object()
-
-        # Get all chats for this user
-        chats = (
-            Chat.objects.filter(Q(participant1=user) | Q(participant2=user))
-            .annotate(message_count=Count("messages"), latest_message=Max("messages__created_at"))
-            .select_related("college", "participant1", "participant2")
-        )
-
-        # Sort chats
-        sort_by = self.request.GET.get("sort", "latest_message")
-        order = self.request.GET.get("order", "desc")
-
-        sort_options = {
-            "created_at": "created_at",
-            "latest_message": "latest_message",
-            "message_count": "message_count",
-            "college": "college__name",
-        }
-
-        if sort_by in sort_options:
-            order_prefix = "-" if order == "desc" else ""
-            chats = chats.order_by(f"{order_prefix}{sort_options[sort_by]}")
-
-        # Paginate chats
-        paginator = Paginator(chats, 20)
-        page = self.request.GET.get("page", 1)
-        chats_page = paginator.get_page(page)
-
-        # Calculate user statistics
-        context["chats"] = chats_page
-        context["current_sort"] = sort_by
-        context["current_order"] = order
-        context["total_chats"] = chats.count()
-        context["total_messages"] = Message.objects.filter(sender=user).count()
-        context["user_stats"] = {
-            "total_chats": chats.count(),
-            "total_messages_sent": Message.objects.filter(sender=user).count(),
-            "active_chats": chats.filter(is_active=True).count(),
-            "colleges_participated": chats.values("college").distinct().count(),
-        }
-
-        return context
+def _parse_date(s):
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
 
 
-@method_decorator(staff_member_required, name="dispatch")
-class ChatDetailView(DetailView):
-    """View to show details of a specific chat and its messages"""
-
-    model = Chat
-    template_name = "analytics/chat_detail.html"
-    context_object_name = "chat"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        chat = self.get_object()
-
-        # Get all messages for this chat
-        messages = chat.messages.all().select_related("sender")
-
-        # Sort messages
-        sort_by = self.request.GET.get("sort", "created_at")
-        order = self.request.GET.get("order", "asc")
-
-        if sort_by == "created_at":
-            order_prefix = "-" if order == "desc" else ""
-            messages = messages.order_by(f"{order_prefix}created_at")
-
-        # Paginate messages
-        paginator = Paginator(messages, 50)
-        page = self.request.GET.get("page", 1)
-        messages_page = paginator.get_page(page)
-
-        # Calculate chat statistics
-        participant1_messages = messages.filter(sender=chat.participant1).count()
-        participant2_messages = messages.filter(sender=chat.participant2).count()
-        system_messages = messages.filter(message_type="system").count()
-
-        context["messages"] = messages_page
-        context["current_sort"] = sort_by
-        context["current_order"] = order
-        context["chat_stats"] = {
-            "total_messages": messages.count(),
-            "participant1_messages": participant1_messages,
-            "participant2_messages": participant2_messages,
-            "system_messages": system_messages,
-            "chat_duration": self._get_chat_duration(messages),
-        }
-
-        return context
-
-    def _get_chat_duration(self, messages):
-        """Calculate the duration of the chat"""
-        if not messages.exists():
-            return "No messages"
-
-        first_message = messages.first()
-        last_message = messages.last()
-
-        if first_message.created_at == last_message.created_at:
-            return "Single message"
-
-        duration = last_message.created_at - first_message.created_at
-
-        if duration.days > 0:
-            return f"{duration.days} days, {duration.seconds // 3600} hours"
-        elif duration.seconds >= 3600:
-            return f"{duration.seconds // 3600} hours, {(duration.seconds % 3600) // 60} minutes"
-        else:
-            return f"{duration.seconds // 60} minutes"
+def _common_filters(request):
+    start = _parse_date(request.GET.get("start"))
+    end = _parse_date(request.GET.get("end"))
+    q = request.GET.get("q")
+    college_id = request.GET.get("college")
+    user_id = request.GET.get("user")
+    return start, end, q, college_id, user_id
 
 
 @staff_member_required
 def analytics_dashboard(request):
-    """Main analytics dashboard with overview statistics"""
+    start, end, *_ = _common_filters(request)
+    chats = Chat.objects.all()
+    messages = Message.objects.all()
+    users = User.objects.all()
+
+    if start:
+        chats = chats.filter(created_at__date__gte=start.date())
+        messages = messages.filter(created_at__date__gte=start.date())
+    if end:
+        chats = chats.filter(created_at__date__lte=end.date())
+        messages = messages.filter(created_at__date__lte=end.date())
+
+    total_users = users.count()
+    total_chats = chats.count()
+    total_messages = messages.count()
+    active_chats = chats.filter(is_active=True).count()
+
+    chats_by_day = (
+        chats.annotate(day=TruncDate("created_at")).values("day").annotate(c=Count("id")).order_by("day")
+    )
+    chats_by_month = (
+        chats.annotate(month=TruncMonth("created_at")).values("month").annotate(c=Count("id")).order_by("month")
+    )
+
+    chat_message_counts = chats.annotate(msgs=Count("messages")).order_by("-msgs")[:20]
+    top_users = users.annotate(msgs=Count("message")).order_by("-msgs")[:20]
+
     context = {
-        "total_users": User.objects.count(),
-        "verified_users": User.objects.filter(is_verified=True).count(),
-        "total_chats": Chat.objects.count(),
-        "active_chats": Chat.objects.filter(is_active=True).count(),
-        "total_messages": Message.objects.count(),
-        "recent_users": User.objects.order_by("-created_at")[:10],
-        "recent_chats": Chat.objects.order_by("-created_at")[:10].select_related("college", "participant1", "participant2"),
-        "top_colleges": Chat.objects.values("college__name").annotate(chat_count=Count("id")).order_by("-chat_count")[:10],
+        "kpis": {
+            "total_users": total_users,
+            "total_chats": total_chats,
+            "total_messages": total_messages,
+            "active_chats": active_chats,
+        },
+        "chats_by_day": list(chats_by_day),
+        "chats_by_month": list(chats_by_month),
+        "chat_message_counts": chat_message_counts,
+        "top_users": top_users,
     }
     return render(request, "analytics/dashboard.html", context)
+
+
+@staff_member_required
+def chats_list(request):
+    start, end, q, college_id, user_id = _common_filters(request)
+    qs = Chat.objects.select_related("participant1", "participant2", "college").annotate(
+        last_msg_at=Max("messages__created_at"),
+        msgs=Count("messages"),
+    )
+    if start:
+        qs = qs.filter(created_at__date__gte=start.date())
+    if end:
+        qs = qs.filter(created_at__date__lte=end.date())
+    if college_id:
+        qs = qs.filter(college_id=college_id)
+    if user_id:
+        qs = qs.filter(Q(participant1_id=user_id) | Q(participant2_id=user_id))
+    if q:
+        qs = qs.filter(
+            Q(participant1__name__icontains=q)
+            | Q(participant1__email__icontains=q)
+            | Q(participant2__name__icontains=q)
+            | Q(participant2__email__icontains=q)
+        )
+
+    sort = request.GET.get("sort", "-last_msg_at")
+    allowed_sorts = {"created_at", "-created_at", "msgs", "-msgs", "last_msg_at", "-last_msg_at"}
+    if sort not in allowed_sorts:
+        sort = "-last_msg_at"
+    qs = qs.order_by(sort)
+
+    paginator = Paginator(qs, 25)
+    page = request.GET.get("page")
+    page_obj = paginator.get_page(page)
+
+    return render(request, "analytics/chats_list.html", {"page_obj": page_obj, "sort": sort})
+
+
+@staff_member_required
+def chat_detail(request, chat_id):
+    chat = get_object_or_404(
+        Chat.objects.select_related("participant1", "participant2", "college"), pk=chat_id
+    )
+    swap = request.GET.get("swap") == "1"
+    messages = chat.messages.select_related("sender").all()
+
+    next_chat = Chat.objects.filter(created_at__gt=chat.created_at).order_by("created_at").first()
+    prev_chat = Chat.objects.filter(created_at__lt=chat.created_at).order_by("-created_at").first()
+
+    context = {
+        "chat": chat,
+        "messages": messages,
+        "swap": swap,
+        "next_chat": next_chat,
+        "prev_chat": prev_chat,
+    }
+    return render(request, "analytics/chat_detail.html", context)
+
+
+@staff_member_required
+def user_chats(request, user_id):
+    user = get_object_or_404(User, pk=user_id)
+    qs = (
+        Chat.objects.filter(Q(participant1=user) | Q(participant2=user))
+        .select_related("participant1", "participant2", "college")
+        .annotate(last_msg_at=Max("messages__created_at"), msgs=Count("messages"))
+        .order_by("-last_msg_at")
+    )
+
+    start_with = request.GET.get("start")
+    if start_with == "reader" and qs.exists():
+        first = qs.first()
+        return redirect("analytics:chat_detail", chat_id=first.id)
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "analytics/user_chats.html", {"user_obj": user, "page_obj": page_obj})
+
+
+@staff_member_required
+def chat_reader(request):
+    start_id = request.GET.get("start")
+    user_id = request.GET.get("user")
+
+    qs = Chat.objects.select_related("participant1", "participant2", "college").order_by("created_at")
+    if user_id:
+        qs = qs.filter(Q(participant1_id=user_id) | Q(participant2_id=user_id))
+
+    if start_id:
+        try:
+            current = qs.get(pk=start_id)
+        except Chat.DoesNotExist as exc:
+            raise Http404("Chat not found") from exc
+    else:
+        current = qs.first()
+        if not current:
+            return render(request, "analytics/reader_empty.html")
+
+    next_chat = qs.filter(created_at__gt=current.created_at).first()
+    prev_chat = qs.filter(created_at__lt=current.created_at).order_by("-created_at").first()
+
+    messages = current.messages.select_related("sender").all()
+    return render(
+        request,
+        "analytics/chat_reader.html",
+        {
+            "chat": current,
+            "messages": messages,
+            "next_chat": next_chat,
+            "prev_chat": prev_chat,
+        },
+    )

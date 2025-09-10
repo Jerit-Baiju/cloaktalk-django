@@ -1,0 +1,58 @@
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-xl font-semibold">Reader</h1>
+    <div class="text-sm text-gray-400">{{ chat.college.name }} · {{ chat.created_at }}</div>
+  </div>
+  <div class="flex items-center gap-2">
+    {% if prev_chat %}
+    <a
+      class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20"
+      href="{% url 'analytics:chat_reader' %}?start={{ prev_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
+      >Prev</a
+    >
+    {% endif %} {% if next_chat %}
+    <a
+      class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
+      href="{% url 'analytics:chat_reader' %}?start={{ next_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
+      >Next</a
+    >
+    {% else %}
+    <span class="px-3 py-1.5 rounded-md bg-white/10 text-gray-400">End</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="glass rounded-xl p-4">
+  <div class="text-sm text-gray-300 mb-3">
+    <span class="font-semibold">{{ chat.participant1.display_name }}</span>
+    <span class="text-gray-500"> ↔ </span>
+    <span class="font-semibold">{{ chat.participant2.display_name }}</span>
+  </div>
+  <div class="space-y-4">
+    {% for m in messages %} {% if m.sender_id == chat.participant1_id %}
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs">A</div>
+      <div>
+        <div class="text-xs text-gray-400">
+          {% if m.sender %}{{ m.sender.display_name }}{% else %}System{% endif %} · {{ m.created_at }}
+        </div>
+        <div class="mt-1 max-w-xl bg-white/5 border border-white/10 rounded-lg px-4 py-2">{{ m.content }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="flex items-start gap-3 justify-end">
+      <div>
+        <div class="text-right text-xs text-gray-400">
+          {% if m.sender %}{{ m.sender.display_name }}{% else %}System{% endif %} · {{ m.created_at }}
+        </div>
+        <div class="mt-1 max-w-xl bg-ctpink-500/10 border border-ctpink-500/30 rounded-lg px-4 py-2">{{ m.content }}</div>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-ctpink-500/20 flex items-center justify-center text-xs">B</div>
+    </div>
+    {% endif %} {% empty %}
+    <div class="text-gray-500">No messages</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

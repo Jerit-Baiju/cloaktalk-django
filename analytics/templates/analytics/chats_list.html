@@ -1,0 +1,65 @@
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">All Chats</h1>
+  <div class="text-sm text-gray-400">Sort: {{ sort }}</div>
+</div>
+
+<div class="glass rounded-xl overflow-hidden">
+  <table class="min-w-full text-sm">
+    <thead class="bg-white/5 text-gray-300">
+      <tr>
+        <th class="px-4 py-3 text-left">Chat</th>
+        <th class="px-4 py-3 text-left">College</th>
+        <th class="px-4 py-3">Msgs</th>
+        <th class="px-4 py-3">Last Msg</th>
+        <th class="px-4 py-3">Created</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-white/5">
+      {% for chat in page_obj.object_list %}
+      <tr class="hover:bg-white/5">
+        <td class="px-4 py-3">
+          <div class="font-medium text-gray-100">{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</div>
+          <div class="text-xs text-gray-400">{{ chat.participant1.email }} · {{ chat.participant2.email }}</div>
+        </td>
+        <td class="px-4 py-3 text-gray-300">{{ chat.college.name }}</td>
+        <td class="px-4 py-3 text-center text-ctpink-400 font-semibold">{{ chat.msgs }}</td>
+        <td class="px-4 py-3 text-gray-300">{{ chat.last_msg_at }}</td>
+        <td class="px-4 py-3 text-gray-300">{{ chat.created_at }}</td>
+        <td class="px-4 py-3 text-right">
+          <div class="flex items-center justify-end gap-2">
+            <a
+              class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
+              href="{% url 'analytics:chat_detail' chat.id %}"
+              >Open</a
+            >
+            <a
+              class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20"
+              href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}"
+              >Read from here</a
+            >
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 py-6 text-center text-gray-500">No chats found</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="mt-4 flex items-center justify-between text-sm">
+  <div class="text-gray-400">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="?page={{ page_obj.previous_page_number }}">Prev</a>
+    {% endif %} {% if page_obj.has_next %}
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
