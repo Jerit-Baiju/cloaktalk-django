@@ -68,7 +68,7 @@ class Message(models.Model):
         ordering = ["created_at"]
 
     def __str__(self):
-        sender_name = self.sender.display_name if self.sender.first_name else "System"
+        sender_name = self.sender.first_name if self.sender else "System"
         return f"{sender_name} -> {self.content}"
 
 
