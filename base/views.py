@@ -19,7 +19,17 @@ class CollegeAccessView(APIView):
 
     def get(self, request):
         user = request.user
-
+        
+        # Debug logging
+        print(f"CollegeAccessView: User authenticated: {user.is_authenticated}")
+        print(f"CollegeAccessView: User: {user}")
+        print(f"CollegeAccessView: User type: {type(user)}")
+        print(f"CollegeAccessView: Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'MISSING')}")
+        print(f"CollegeAccessView: Content-Type: {request.META.get('CONTENT_TYPE', 'MISSING')}")
+        print(f"CollegeAccessView: HTTP_HOST: {request.META.get('HTTP_HOST', 'MISSING')}")
+        if hasattr(user, 'college'):
+            print(f"CollegeAccessView: User college: {user.college}")
+        
         # Check if user has a college
         if not user.college:
             # Auto-assign college based on email domain
@@ -54,6 +64,13 @@ class CollegeAccessView(APIView):
             user.save()
 
         college = user.college
+
+        # Debug college settings
+        print(f"CollegeAccessView: College name: {college.name}")
+        print(f"CollegeAccessView: College is_active: {college.is_active}")
+        print(f"CollegeAccessView: College window_start: {college.window_start}")
+        print(f"CollegeAccessView: College window_end: {college.window_end}")
+        print(f"CollegeAccessView: Current time: {timezone.localtime().time()}")
 
         # Check if college is active
         if not college.is_active:

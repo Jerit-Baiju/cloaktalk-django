@@ -1,12 +1,20 @@
 import json
 import logging
-from channels.generic.websocket import AsyncWebsocketConsumer
+
 from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from base.models import Chat, Message, College
+from jwt import decode as jwt_decode
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.tokens import UntypedToken
+
+from base.models import Chat, College, Message
 from base.services import MatchingService
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 class QueueConsumer(AsyncWebsocketConsumer):
@@ -14,18 +22,21 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         """Handle WebSocket connection."""
-        self.user = self.scope.get("user")
+        # Try to authenticate user from token
+        self.user = await self.get_user_from_token()
         
-        if isinstance(self.user, AnonymousUser) or not self.user.is_authenticated:
+        if not self.user or isinstance(self.user, AnonymousUser):
             await self.close(code=4001)
             return
         
-        if not self.user.college:
+        # Check if user has college (using sync_to_async for foreign key access)
+        user_college = await database_sync_to_async(lambda: self.user.college)()
+        if not user_college:
             await self.close(code=4002)  # No college assigned
             return
             
         # Join college group for queue updates
-        self.college_group_name = f"queue_{self.user.college.id}"
+        self.college_group_name = f"queue_{user_college.id}"
         await self.channel_layer.group_add(
             self.college_group_name,
             self.channel_name
@@ -35,6 +46,37 @@ class QueueConsumer(AsyncWebsocketConsumer):
         
         # Send initial queue status
         await self.send_queue_status()
+    
+    async def get_user_from_token(self):
+        """Extract and validate JWT token from query parameters."""
+        try:
+            # Get token from query string
+            query_string = self.scope.get("query_string", b"").decode()
+            query_params = dict(param.split("=") for param in query_string.split("&") if "=" in param)
+            token = query_params.get("token")
+            
+            if not token:
+                return None
+            
+            # Validate JWT token
+            try:
+                UntypedToken(token)
+            except (InvalidToken, TokenError):
+                return None
+            
+            # Decode token to get user ID
+            decoded_token = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = decoded_token.get("user_id")
+            
+            if not user_id:
+                return None
+            
+            # Get user from database
+            user = await database_sync_to_async(User.objects.get)(id=user_id)
+            return user
+        except Exception as e:
+            logger.error("Error authenticating WebSocket user: %s", e)
+            return None
         
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
@@ -64,8 +106,9 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def join_queue(self):
         """Add user to waiting queue."""
+        user_college = await database_sync_to_async(lambda: self.user.college)()
         added = await database_sync_to_async(MatchingService.add_to_waiting_list)(
-            self.user, self.user.college
+            self.user, user_college
         )
         
         if added:
@@ -88,8 +131,9 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def leave_queue(self):
         """Remove user from waiting queue."""
+        user_college = await database_sync_to_async(lambda: self.user.college)()
         removed = await database_sync_to_async(MatchingService.remove_from_waiting_list)(
-            self.user, self.user.college
+            self.user, user_college
         )
         
         if removed:
@@ -103,8 +147,9 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def try_match(self):
         """Try to match users and create chat if possible."""
+        user_college = await database_sync_to_async(lambda: self.user.college)()
         chat = await database_sync_to_async(MatchingService.try_match_users)(
-            self.user.college
+            user_college
         )
         
         if chat:
@@ -130,14 +175,15 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def send_queue_status(self):
         """Send current queue status to user."""
+        user_college = await database_sync_to_async(lambda: self.user.college)()
         count = await database_sync_to_async(MatchingService.get_waiting_count)(
-            self.user.college
+            user_college
         )
         
         await self.send(text_data=json.dumps({
             'type': 'queue_status',
             'waiting_count': count,
-            'college': self.user.college.name
+            'college': user_college.name
         }))
     
     async def queue_update(self, event):
@@ -158,10 +204,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         """Handle WebSocket connection for chat."""
-        self.user = self.scope.get("user")
+        self.user = await self.get_user_from_token()
         self.chat_id = self.scope['url_route']['kwargs']['chat_id']
         
-        if isinstance(self.user, AnonymousUser) or not self.user.is_authenticated:
+        if not self.user or isinstance(self.user, AnonymousUser):
             await self.close(code=4001)
             return
         
@@ -191,6 +237,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Send recent messages
         await self.send_recent_messages()
     
+    async def get_user_from_token(self):
+        """Extract and validate JWT token from query parameters."""
+        try:
+            # Get token from query string
+            query_string = self.scope.get("query_string", b"").decode()
+            query_params = dict(param.split("=") for param in query_string.split("&") if "=" in param)
+            token = query_params.get("token")
+            
+            if not token:
+                return None
+            
+            # Validate JWT token
+            try:
+                UntypedToken(token)
+            except (InvalidToken, TokenError):
+                return None
+            
+            # Decode token to get user ID
+            decoded_token = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = decoded_token.get("user_id")
+            
+            if not user_id:
+                return None
+            
+            # Get user from database
+            user = await database_sync_to_async(User.objects.get)(id=user_id)
+            return user
+        except Exception as e:
+            logger.error("Error authenticating WebSocket user: %s", e)
+            return None
+
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         if hasattr(self, 'room_group_name'):
