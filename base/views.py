@@ -214,7 +214,7 @@ class CollegeStatusView(APIView):
 
 from rest_framework.decorators import api_view, permission_classes
 
-from base.models import Chat, Message
+from base.models import Chat, Message, WaitingListEntry
 from base.services import MatchingService
 
 
@@ -228,8 +228,42 @@ def queue_status(request):
         return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
 
     waiting_count = MatchingService.get_waiting_count(user.college)
+    is_in_queue = WaitingListEntry.objects.filter(user=user, college=user.college).exists()
 
-    return Response({"waiting_count": waiting_count, "college": user.college.name, "college_id": user.college.id})
+    return Response({
+        "waiting_count": waiting_count,
+        "college": user.college.name,
+        "college_id": user.college.id,
+        "is_in_queue": is_in_queue,
+    })
+
+
+@api_view(["GET"])  # New endpoint
+@permission_classes([IsAuthenticated])
+def college_activity(request):
+    """Return activity stats for the current user's college: active chats and waiting users."""
+    user = request.user
+
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+
+    college = user.college
+
+    # Count active chats for this college
+    active_chats_count = Chat.objects.filter(college=college, is_active=True).count()
+
+    # Count users waiting
+    waiting_count = MatchingService.get_waiting_count(college)
+
+    return Response(
+        {
+            "college_id": college.id,
+            "college": college.name,
+            "active_chats": active_chats_count,
+            "waiting_count": waiting_count,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["POST"])
@@ -261,11 +295,26 @@ def join_queue(request):
         else:
             waiting_count = MatchingService.get_waiting_count(user.college)
             return Response(
-                {"matched": False, "waiting_count": waiting_count, "message": "Added to queue. Waiting for match..."},
+                {
+                    "matched": False,
+                    "waiting_count": waiting_count,
+                    "message": "Added to queue. Waiting for match...",
+                    "is_in_queue": True,
+                },
                 status=status.HTTP_201_CREATED,
             )
     else:
-        return Response({"error": "Already in queue"}, status=status.HTTP_400_BAD_REQUEST)
+        # If already in queue, don't treat as error; return current status
+        waiting_count = MatchingService.get_waiting_count(user.college)
+        return Response(
+            {
+                "matched": False,
+                "waiting_count": waiting_count,
+                "message": "Already in queue",
+                "is_in_queue": True,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 @api_view(["POST"])

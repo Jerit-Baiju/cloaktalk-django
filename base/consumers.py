@@ -10,7 +10,7 @@ from jwt import decode as jwt_decode
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken
 
-from base.models import Chat, College, Message
+from base.models import Chat, Message
 from base.services import MatchingService
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,11 @@ User = get_user_model()
 
 class QueueConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for handling waiting queue functionality."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Predefine attributes to satisfy linters
+        self.user = None
+        self.college_group_name = ""
     
     async def connect(self):
         """Handle WebSocket connection."""
@@ -78,7 +83,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
             logger.error("Error authenticating WebSocket user: %s", e)
             return None
         
-    async def disconnect(self, close_code):
+    async def disconnect(self, code):
         """Handle WebSocket disconnection."""
         if hasattr(self, 'college_group_name'):
             await self.channel_layer.group_discard(
@@ -86,10 +91,10 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
     
-    async def receive(self, text_data):
+    async def receive(self, text_data=None, bytes_data=None):
         """Handle incoming WebSocket messages."""
         try:
-            data = json.loads(text_data)
+            data = json.loads(text_data or '{}')
             action = data.get('action')
             
             if action == 'join_queue':
@@ -107,6 +112,15 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def join_queue(self):
         """Add user to waiting queue."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
+        # If user already has an active chat, return a non-queue status
+        active_chat = await database_sync_to_async(MatchingService.get_active_chat)(self.user)
+        if active_chat:
+            await self.send(text_data=json.dumps({
+                'type': 'chat_matched',
+                'chat_id': str(active_chat.id),
+                'message': 'Already in an active chat.'
+            }))
+            return
         added = await database_sync_to_async(MatchingService.add_to_waiting_list)(
             self.user, user_college
         )
@@ -124,9 +138,13 @@ class QueueConsumer(AsyncWebsocketConsumer):
             # Try to find a match
             await self.try_match()
         else:
+            # Already in queue; respond gracefully with current status
+            count = await database_sync_to_async(MatchingService.get_waiting_count)(user_college)
             await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Already in queue'
+                'type': 'queue_status',
+                'waiting_count': count,
+                'college': user_college.name,
+                'is_in_queue': True
             }))
     
     async def leave_queue(self):
@@ -176,17 +194,19 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def send_queue_status(self):
         """Send current queue status to user."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
-        count = await database_sync_to_async(MatchingService.get_waiting_count)(
-            user_college
-        )
+        count = await database_sync_to_async(MatchingService.get_waiting_count)(user_college)
+        # Determine if current user is already queued
+        from base.models import WaitingListEntry
+        is_in_queue = await database_sync_to_async(WaitingListEntry.objects.filter(user=self.user, college=user_college).exists)()
         
         await self.send(text_data=json.dumps({
             'type': 'queue_status',
             'waiting_count': count,
-            'college': user_college.name
+            'college': user_college.name,
+            'is_in_queue': is_in_queue
         }))
     
-    async def queue_update(self, event):
+    async def queue_update(self, _event):
         """Handle queue update events."""
         await self.send_queue_status()
     
@@ -201,6 +221,12 @@ class QueueConsumer(AsyncWebsocketConsumer):
 
 class ChatConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for handling chat functionality."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = None
+        self.chat_id = None
+        self.chat = None
+        self.room_group_name = ""
     
     async def connect(self):
         """Handle WebSocket connection for chat."""
@@ -268,7 +294,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.error("Error authenticating WebSocket user: %s", e)
             return None
 
-    async def disconnect(self, close_code):
+    async def disconnect(self, code):
         """Handle WebSocket disconnection."""
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
@@ -276,10 +302,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
     
-    async def receive(self, text_data):
+    async def receive(self, text_data=None, bytes_data=None):
         """Handle incoming chat messages."""
         try:
-            data = json.loads(text_data)
+            data = json.loads(text_data or '{}')
             action = data.get('action')
             
             if action == 'send_message':

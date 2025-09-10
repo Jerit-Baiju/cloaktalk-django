@@ -73,11 +73,31 @@ class MatchingService:
         Try to match users in the waiting list for a college.
         Returns Chat object if successful match, None otherwise.
         """
-        match = cls.find_match(college)
-        if match:
+    # Keep attempting to find a valid pair (defensive against stale entries)
+
+        while True:
+            match = cls.find_match(college)
+            if not match:
+                return None
+
             user1, user2 = match
+            user1_active = cls.get_active_chat(user1)
+            user2_active = cls.get_active_chat(user2)
+
+            # If either already has an active chat, remove their waiting entry and try again
+            removed_any = False
+            if user1_active:
+                WaitingListEntry.objects.filter(user=user1, college=college).delete()
+                removed_any = True
+            if user2_active:
+                WaitingListEntry.objects.filter(user=user2, college=college).delete()
+                removed_any = True
+
+            if removed_any:
+                continue
+
+            # Neither user has an active chat -> create a new chat
             return cls.create_chat(user1, user2, college)
-        return None
 
     @classmethod
     def get_active_chat(cls, user: User) -> Optional[Chat]:

@@ -5,6 +5,7 @@ from base import views
 urlpatterns = [
     path("college/access/", views.CollegeAccessView.as_view(), name="college_access"),
     path("college/status/", views.CollegeStatusView.as_view(), name="college_status"),
+    path("college/activity/", views.college_activity, name="college_activity"),
     
     # Queue management endpoints
     path("queue/status/", views.queue_status, name="queue_status"),
