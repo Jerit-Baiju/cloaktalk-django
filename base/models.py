@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 
 # Create your models here.
@@ -19,5 +20,52 @@ class WaitingListEntry(models.Model):
     college = models.ForeignKey(College, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ['user', 'college']
+
     def __str__(self):
         return f"{self.college.name} - {self.user.email}"
+
+
+class Chat(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    college = models.ForeignKey(College, on_delete=models.CASCADE)
+    participant1 = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="chats_as_participant1")
+    participant2 = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="chats_as_participant2")
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "chats"
+
+    def __str__(self):
+        return f"Chat {self.id} - {self.college.name}"
+
+    def get_participants(self):
+        return [self.participant1, self.participant2]
+
+    def is_participant(self, user):
+        return user in [self.participant1, self.participant2]
+
+
+class Message(models.Model):
+    MESSAGE_TYPES = [
+        ('text', 'Text'),
+        ('system', 'System'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey("accounts.User", on_delete=models.CASCADE, null=True, blank=True)
+    content = models.TextField()
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default='text')
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "messages"
+        ordering = ['created_at']
+
+    def __str__(self):
+        sender_name = self.sender.display_name if self.sender else "System"
+        return f"Message from {sender_name} in {self.chat.id}"

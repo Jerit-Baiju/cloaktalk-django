@@ -31,6 +31,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "rest_framework",
     "corsheaders",
     "django.contrib.admin",
@@ -73,7 +74,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "main.wsgi.application"
+# WSGI_APPLICATION = "main.wsgi.application"  # Commented out to use ASGI
 
 
 # Database
@@ -157,3 +158,14 @@ SIMPLE_JWT = {
 
 GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 GOOGLE_CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
+
+# Channels Configuration
+ASGI_APPLICATION = "main.asgi.application"
+
+# Channel layer configuration (using in-memory for development)
+# For production, consider using Redis: https://channels.readthedocs.io/en/stable/topics/channel_layers.html
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}

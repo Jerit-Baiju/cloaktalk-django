@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,7 @@ class CollegeAccessView(APIView):
     Check if the current user can access the application based on their college's
     active status and time window settings.
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -22,6 +24,7 @@ class CollegeAccessView(APIView):
         if not user.college:
             # Auto-assign college based on email domain
             from accounts.utils import get_domain_from_email
+
             domain = get_domain_from_email(user.email)
 
             # Try to find existing college for this domain
@@ -30,20 +33,20 @@ class CollegeAccessView(APIView):
             # If no college exists, create one
             if not college:
                 # Extract a readable college name from domain
-                college_name = domain.replace('.', ' ').title()
-                if college_name.endswith(' Edu'):
-                    college_name = college_name[:-4] + ' University'
-                elif college_name.endswith(' Ac In'):
-                    college_name = college_name[:-6] + ' College'
+                college_name = domain.replace(".", " ").title()
+                if college_name.endswith(" Edu"):
+                    college_name = college_name[:-4] + " University"
+                elif college_name.endswith(" Ac In"):
+                    college_name = college_name[:-6] + " College"
                 elif domain.lower() in {"gmail.com", "googlemail.com"}:
                     college_name = "Gmail Users"
 
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start='20:00:00',  # Default 8 PM
-                    window_end='21:00:00',    # Default 9 PM
-                    is_active=False           # New colleges start inactive
+                    window_start="20:00:00",  # Default 8 PM
+                    window_end="21:00:00",  # Default 9 PM
+                    is_active=False,  # New colleges start inactive
                 )
 
             # Assign college to user
@@ -54,13 +57,16 @@ class CollegeAccessView(APIView):
 
         # Check if college is active
         if not college.is_active:
-            return Response({
-                'can_access': False,
-                'reason': 'college_inactive',
-                'message': f'Access for {college.name} is currently disabled',
-                'college_name': college.name,
-                'college_domain': college.domain
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {
+                    "can_access": False,
+                    "reason": "college_inactive",
+                    "message": f"Access for {college.name} is currently disabled",
+                    "college_name": college.name,
+                    "college_domain": college.domain,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Check time window using local time based on settings.TIME_ZONE
         current_time = timezone.localtime().time()
@@ -74,25 +80,31 @@ class CollegeAccessView(APIView):
             in_time_window = current_time >= college.window_start or current_time <= college.window_end
 
         if not in_time_window:
-            return Response({
-                'can_access': False,
-                'reason': 'outside_window',
-                'message': f'Access is only available between {college.window_start.strftime("%H:%M")} and {college.window_end.strftime("%H:%M")}',
-                'college_name': college.name,
-                'window_start': college.window_start.strftime('%H:%M:%S'),
-                'window_end': college.window_end.strftime('%H:%M:%S')
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {
+                    "can_access": False,
+                    "reason": "outside_window",
+                    "message": f'Access is only available between {college.window_start.strftime("%H:%M")} and {college.window_end.strftime("%H:%M")}',
+                    "college_name": college.name,
+                    "window_start": college.window_start.strftime("%H:%M:%S"),
+                    "window_end": college.window_end.strftime("%H:%M:%S"),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # User can access
-        return Response({
-            'can_access': True,
-            'message': 'Access granted',
-            'college_name': college.name,
-            'window_start': college.window_start.strftime('%H:%M:%S'),
-            'window_end': college.window_end.strftime('%H:%M:%S'),
-            'time_remaining_seconds': self._calculate_time_remaining(current_time, college.window_end)
-        }, status=status.HTTP_200_OK)
-    
+        return Response(
+            {
+                "can_access": True,
+                "message": "Access granted",
+                "college_name": college.name,
+                "window_start": college.window_start.strftime("%H:%M:%S"),
+                "window_end": college.window_end.strftime("%H:%M:%S"),
+                "time_remaining_seconds": self._calculate_time_remaining(current_time, college.window_end),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def _calculate_time_remaining(self, current_time, window_end):
         """Calculate seconds remaining in the current window"""
         try:
@@ -103,7 +115,7 @@ class CollegeAccessView(APIView):
             # Handle cross-midnight case robustly
             if window_end < current_time:
                 end_dt = end_dt + timedelta(days=1)
-            
+
             remaining = (end_dt - now_dt).total_seconds()
             return max(0, int(remaining))
         except:
@@ -114,6 +126,7 @@ class CollegeStatusView(APIView):
     """
     Get college information for the current user including timing windows
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -122,6 +135,7 @@ class CollegeStatusView(APIView):
         if not user.college:
             # Auto-assign college based on email domain
             from accounts.utils import get_domain_from_email
+
             domain = get_domain_from_email(user.email)
 
             # Try to find existing college for this domain
@@ -130,21 +144,21 @@ class CollegeStatusView(APIView):
             # If no college exists, create one
             if not college:
                 # Extract a readable college name from domain
-                college_name = domain.replace('.', ' ').title()
-                if college_name.endswith(' Edu'):
-                    college_name = college_name[:-4] + ' University'
-                    
-                elif college_name.endswith(' Ac In'):
-                    college_name = college_name[:-6] + ' College'
+                college_name = domain.replace(".", " ").title()
+                if college_name.endswith(" Edu"):
+                    college_name = college_name[:-4] + " University"
+
+                elif college_name.endswith(" Ac In"):
+                    college_name = college_name[:-6] + " College"
                 elif domain.lower() in {"gmail.com", "googlemail.com"}:
                     college_name = "Gmail Users"
 
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start='20:00:00',  # Default 8 PM
-                    window_end='21:00:00',    # Default 9 PM
-                    is_active=False           # New colleges start inactive
+                    window_start="20:00:00",  # Default 8 PM
+                    window_end="21:00:00",  # Default 9 PM
+                    is_active=False,  # New colleges start inactive
                 )
 
             # Assign college to user
@@ -161,16 +175,179 @@ class CollegeStatusView(APIView):
         else:
             in_window = current_time >= college.window_start or current_time <= college.window_end
 
-        return Response({
-            'has_college': True,
-            'college': {
-                'id': college.id,
-                'name': college.name,
-                'domain': college.domain,
-                'is_active': college.is_active,
-                'window_start': college.window_start.strftime('%H:%M:%S'),
-                'window_end': college.window_end.strftime('%H:%M:%S'),
-                'currently_in_window': in_window,
-                'can_access': college.is_active and in_window
+        return Response(
+            {
+                "has_college": True,
+                "college": {
+                    "id": college.id,
+                    "name": college.name,
+                    "domain": college.domain,
+                    "is_active": college.is_active,
+                    "window_start": college.window_start.strftime("%H:%M:%S"),
+                    "window_end": college.window_end.strftime("%H:%M:%S"),
+                    "currently_in_window": in_window,
+                    "can_access": college.is_active and in_window,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# WebSocket and Chat Views
+
+from rest_framework.decorators import api_view, permission_classes
+
+from base.models import Chat, Message
+from base.services import MatchingService
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def queue_status(request):
+    """Get current queue status for user's college."""
+    user = request.user
+
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+
+    waiting_count = MatchingService.get_waiting_count(user.college)
+
+    return Response({"waiting_count": waiting_count, "college": user.college.name, "college_id": user.college.id})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def join_queue(request):
+    """Add user to waiting queue."""
+    user = request.user
+
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if user already has an active chat
+    active_chat = MatchingService.get_active_chat(user)
+    if active_chat:
+        return Response(
+            {"error": "User already has an active chat", "chat_id": str(active_chat.id)}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    added = MatchingService.add_to_waiting_list(user, user.college)
+
+    if added:
+        # Try to find an immediate match
+        chat = MatchingService.try_match_users(user.college)
+
+        if chat:
+            return Response(
+                {"matched": True, "chat_id": str(chat.id), "message": "Match found!"}, status=status.HTTP_201_CREATED
+            )
+        else:
+            waiting_count = MatchingService.get_waiting_count(user.college)
+            return Response(
+                {"matched": False, "waiting_count": waiting_count, "message": "Added to queue. Waiting for match..."},
+                status=status.HTTP_201_CREATED,
+            )
+    else:
+        return Response({"error": "Already in queue"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def leave_queue(request):
+    """Remove user from waiting queue."""
+    user = request.user
+
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+
+    removed = MatchingService.remove_from_waiting_list(user, user.college)
+
+    if removed:
+        return Response({"message": "Removed from queue successfully"})
+    else:
+        return Response({"error": "Not in queue"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_chat(request, chat_id):
+    """Get chat details and recent messages."""
+    user = request.user
+
+    try:
+        chat = Chat.objects.get(id=chat_id, is_active=True)
+
+        if not chat.is_participant(user):
+            return Response({"error": "Not authorized to access this chat"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get recent messages
+        messages = Message.objects.filter(chat=chat).order_by("-created_at")[:50]
+
+        message_data = []
+        for message in reversed(messages):
+            message_data.append(
+                {
+                    "id": str(message.id),
+                    "content": message.content,
+                    "message_type": message.message_type,
+                    "timestamp": message.created_at.isoformat(),
+                    "is_own": message.sender == user if message.sender else False,
+                }
+            )
+
+        return Response(
+            {
+                "chat_id": str(chat.id),
+                "college": chat.college.name,
+                "created_at": chat.created_at.isoformat(),
+                "is_active": chat.is_active,
+                "messages": message_data,
             }
-        }, status=status.HTTP_200_OK)
+        )
+
+    except Chat.DoesNotExist:
+        return Response({"error": "Chat not found or inactive"}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_active_chat(request):
+    """Get user's current active chat if any."""
+    user = request.user
+
+    active_chat = MatchingService.get_active_chat(user)
+
+    if active_chat:
+        return Response(
+            {
+                "has_active_chat": True,
+                "chat_id": str(active_chat.id),
+                "college": active_chat.college.name,
+                "created_at": active_chat.created_at.isoformat(),
+            }
+        )
+    else:
+        return Response({"has_active_chat": False})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def end_chat(request, chat_id):
+    """End an active chat."""
+    user = request.user
+
+    try:
+        chat = Chat.objects.get(id=chat_id, is_active=True)
+
+        if not chat.is_participant(user):
+            return Response({"error": "Not authorized to end this chat"}, status=status.HTTP_403_FORBIDDEN)
+
+        success = MatchingService.end_chat(chat)
+
+        if success:
+            return Response({"message": "Chat ended successfully"})
+        else:
+            return Response({"error": "Chat is already ended"}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Chat.DoesNotExist:
+        return Response({"error": "Chat not found"}, status=status.HTTP_404_NOT_FOUND)
