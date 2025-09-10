@@ -54,9 +54,13 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    # Security first
     "django.middleware.security.SecurityMiddleware",
+    # Serve static files efficiently
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # CORS should be as high as possible but after security/whitenoise
+    "corsheaders.middleware.CorsMiddleware",
+    # Standard Django middleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -70,7 +74,7 @@ ROOT_URLCONF = "main.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -130,8 +134,19 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+# URL where static files are served from
+STATIC_URL = "/static/"
+
+# Additional locations of static files (project-level 'static' folder)
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+# Where collectstatic will put files for production serving
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise storage for compression and cache-busting manifests (safe for dev/prod)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media files (User uploaded content)
 MEDIA_URL = "/media/"

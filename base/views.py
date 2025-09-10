@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
 from typing import Any
 
+from django.contrib import messages
+from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views import View
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from base.models import College
+from base.models import College, Feedback
 
 
 def _format_time_field(t: Any) -> str:
@@ -428,3 +431,21 @@ def end_chat(request, chat_id):
 
     except Chat.DoesNotExist:
         return Response({"error": "Chat not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HomepageView(View):
+    """Homepage view with feedback form"""
+    
+    def get(self, request):
+        return render(request, 'homepage.html')
+    
+    def post(self, request):
+        comments = request.POST.get('comments', '').strip()
+        
+        if comments:
+            Feedback.objects.create(comments=comments)
+            messages.success(request, 'Thank you for your feedback!')
+        else:
+            messages.error(request, 'Please provide some feedback before submitting.')
+            
+        return redirect('homepage')

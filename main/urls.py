@@ -3,9 +3,10 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from base.views import CollegeAccessView, CollegeStatusView
+from base.views import CollegeAccessView, CollegeStatusView, HomepageView
 
 urlpatterns = [
+    path("", HomepageView.as_view(), name="homepage"),
     path("api/", include("base.urls")),
     path("auth/", include("accounts.urls")),
     path("admin/", admin.site.urls),

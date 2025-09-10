@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import models
 
 # Create your models here.
@@ -21,7 +22,7 @@ class WaitingListEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['user', 'college']
+        unique_together = ["user", "college"]
 
     def __str__(self):
         return f"{self.college.name} - {self.user.email}"
@@ -50,22 +51,33 @@ class Chat(models.Model):
 
 class Message(models.Model):
     MESSAGE_TYPES = [
-        ('text', 'Text'),
-        ('system', 'System'),
+        ("text", "Text"),
+        ("system", "System"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey("accounts.User", on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
-    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default='text')
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default="text")
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 
     class Meta:
         db_table = "messages"
-        ordering = ['created_at']
+        ordering = ["created_at"]
 
     def __str__(self):
         sender_name = self.sender.display_name if self.sender.first_name else "System"
         return f"{sender_name} -> {self.content}"
+
+
+class Feedback(models.Model):
+    comments = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "feedbacks"
+
+    def __str__(self):
+        return f"Feedback - {self.created_at.strftime('%Y-%m-%d %H:%M')}"

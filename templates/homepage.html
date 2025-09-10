@@ -1,0 +1,84 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CloakTalk – Anonymous College Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="theme-color" content="#000000" />
+  </head>
+  <body class="min-h-screen bg-black text-white antialiased">
+    <div class="relative">
+      <!-- subtle pink glow background -->
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
+        <div class="absolute left-1/2 top-[-10%] h-[40rem] w-[40rem] -translate-x-1/2 rounded-full bg-pink-600/20 blur-3xl"></div>
+      </div>
+    </div>
+
+    <main class="mx-auto max-w-3xl px-4 py-10 sm:py-14">
+      <!-- Header -->
+      <header class="mb-8 flex flex-col items-center text-center sm:mb-10">
+        <img
+          src="{% static 'images/logo.png' %}"
+          alt="CloakTalk logo"
+          class="mb-4 h-16 w-16 rounded-2xl ring-1 ring-pink-500/50 shadow-[0_10px_40px_-12px_rgba(236,72,153,0.5)]" />
+        <h1 class="text-3xl font-extrabold tracking-tight sm:text-4xl">
+          <span class="bg-gradient-to-r from-pink-400 via-pink-500 to-pink-600 bg-clip-text text-transparent">CloakTalk</span>
+        </h1>
+        <p class="mt-2 text-sm text-pink-200/80 sm:text-base">Anonymous Chat Platform for College Students</p>
+      </header>
+
+      <!-- Intro paragraph (above feedback box) -->
+      <section class="mb-6">
+        <p class="rounded-xl border border-pink-500/20 bg-pink-500/10 p-4 text-sm leading-relaxed text-pink-100">
+          We’re in early beta and we know there are bugs. We’ll be back very soon with fixes and improvements. Tell us what features
+          you’d love to see next and how we can make CloakTalk better.
+        </p>
+      </section>
+
+      <!-- Flash messages -->
+      {% if messages %}
+      <div class="mb-6 space-y-2" role="region" aria-label="Notifications">
+        {% for message in messages %}
+        <div class="rounded-lg border border-pink-500/30 bg-pink-500/10 px-4 py-3 text-sm text-pink-100">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Feedback card -->
+      <section class="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 shadow-xl backdrop-blur">
+        <h2 class="mb-4 text-lg font-semibold tracking-tight text-pink-300">Share Your Feedback</h2>
+        <form method="post" class="space-y-4">
+          {% csrf_token %}
+          <div>
+            <label for="comments" class="mb-2 block text-sm font-medium text-neutral-200">Your Feedback</label>
+            <textarea
+              id="comments"
+              name="comments"
+              required
+              rows="6"
+              placeholder="Tell us what you think—bugs you’ve noticed, improvements we should make, or features you’d love to have."
+              class="w-full resize-y rounded-xl border border-neutral-700 bg-black/60 p-3 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none ring-0 transition focus:border-pink-500 focus:shadow-[0_0_0_3px_rgba(236,72,153,0.25)]"></textarea>
+          </div>
+
+          <button
+            type="submit"
+            class="inline-flex w-full items-center justify-center rounded-xl bg-pink-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-pink-500 focus:outline-none focus:ring-4 focus:ring-pink-500/30">
+            Send Feedback
+          </button>
+        </form>
+      </section>
+
+      <!-- Closing paragraph (below feedback box) -->
+      <section class="mt-6">
+  <p class="text-sm leading-relaxed text-neutral-300">Thanks for trying CloakTalk — your feedback helps us improve.</p>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-12 border-t border-neutral-900 pt-6 text-center text-xs text-neutral-500">
+        <p>&copy; 2025 CloakTalk. Built for anonymous college conversations.</p>
+      </footer>
+    </main>
+  </body>
+</html>
