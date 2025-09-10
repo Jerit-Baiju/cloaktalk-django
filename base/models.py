@@ -39,7 +39,7 @@ class Chat(models.Model):
         db_table = "chats"
 
     def __str__(self):
-        return f"Chat {self.id} - {self.college.name}"
+        return f"{self.college.name}: {self.participant1.first_name} -> {self.participant2.first_name}"
 
     def get_participants(self):
         return [self.participant1, self.participant2]
@@ -67,5 +67,5 @@ class Message(models.Model):
         ordering = ['created_at']
 
     def __str__(self):
-        sender_name = self.sender.display_name if self.sender else "System"
-        return f"Message from {sender_name} in {self.chat.id}"
+        sender_name = self.sender.display_name if self.sender.first_name else "System"
+        return f"{sender_name} -> {self.content}"
