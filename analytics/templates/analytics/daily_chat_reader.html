@@ -1,0 +1,183 @@
+{% extends 'analytics/base_analytics.html' %} {% block content %} {% if total_chats == 0 %}
+<!-- No chats for this day -->
+<div class="text-center py-12">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke-width="1.5"
+    stroke="currentColor"
+    class="w-16 h-16 mx-auto mb-4 text-gray-600">
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+  </svg>
+
+  <h2 class="text-xl font-semibold text-gray-300 mb-2">No chats on {{ target_date|date:"F j, Y" }}</h2>
+  <p class="text-gray-500 mb-6">There were no conversations started on this day.</p>
+
+  <div class="flex justify-center gap-4">
+    {% if prev_day_with_chats %}
+    <a
+      href="{% url 'analytics:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
+      class="px-4 py-2 rounded-lg bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
+      Previous Day with Chats ({{ prev_day_with_chats|date:"M j" }})
+    </a>
+    {% endif %} {% if next_day_with_chats %}
+    <a
+      href="{% url 'analytics:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
+      class="px-4 py-2 rounded-lg bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
+      Next Day with Chats ({{ next_day_with_chats|date:"M j" }})
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<!-- Header with Navigation -->
+<div class="flex items-center justify-between mb-6">
+  <div class="flex items-center gap-4">
+    <h1 class="text-2xl font-bold text-ctpink-400">Daily Chat Reader</h1>
+    <div class="text-lg text-gray-300">{{ target_date|date:"F j, Y" }}</div>
+    <div class="text-sm text-gray-400">Chat {{ chat_index|add:1 }} of {{ total_chats }}</div>
+  </div>
+
+  <!-- Day Navigation -->
+  <div class="flex items-center gap-2">
+    {% if prev_day_with_chats %}
+    <a
+      href="{% url 'analytics:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
+      class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">
+      ← {{ prev_day_with_chats|date:"M j" }}
+    </a>
+    {% endif %}
+
+    <form method="get" class="flex gap-2">
+      <input
+        type="date"
+        name="date"
+        value="{{ target_date|date:'Y-m-d' }}"
+        class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
+      <button type="submit" class="px-3 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold text-sm">Go</button>
+    </form>
+
+    {% if next_day_with_chats %}
+    <a
+      href="{% url 'analytics:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
+      class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">
+      {{ next_day_with_chats|date:"M j" }} →
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Chat Navigation within Day -->
+<div class="flex items-center justify-between mb-6 p-4 glass rounded-lg">
+  <div class="flex items-center gap-4">
+    {% if prev_chat_index is not None %}
+    <a
+      href="?date={{ target_date|date:'Y-m-d' }}&index={{ prev_chat_index }}"
+      class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
+      ← Previous Chat
+    </a>
+    {% else %}
+    <span class="px-4 py-2 rounded-md bg-gray-600 text-gray-400 cursor-not-allowed"> ← Previous Chat </span>
+    {% endif %}
+
+    <div class="text-center">
+      <div class="text-sm text-gray-400">Progress through day</div>
+      <div class="w-64 bg-gray-700 rounded-full h-2 mt-1">
+        {% widthratio chat_index|add:1 total_chats 100 as progress_width %}
+        <div class="bg-ctpink-500 h-2 rounded-full" style="width: {{ progress_width }}%"></div>
+      </div>
+    </div>
+
+    {% if next_chat_index is not None %}
+    <a
+      href="?date={{ target_date|date:'Y-m-d' }}&index={{ next_chat_index }}"
+      class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
+      Next Chat →
+    </a>
+    {% else %}
+    <span class="px-4 py-2 rounded-md bg-gray-600 text-gray-400 cursor-not-allowed"> Next Chat → </span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Chat Content -->
+<div class="glass rounded-xl p-6">
+  <!-- Chat Header -->
+  <div class="border-b border-white/10 pb-4 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-semibold text-ctpink-400">
+          {{ current_chat.participant1.display_name }} ↔ {{ current_chat.participant2.display_name }}
+        </h2>
+        <div class="text-sm text-gray-400 mt-1">
+          {{ current_chat.college.name }} • Started at {{ current_chat.created_at|date:"H:i" }}
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <a href="{% url 'analytics:chat_detail' current_chat.id %}" class="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">
+          Full Details
+        </a>
+        <a
+          href="{% url 'analytics:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
+          class="px-3 py-2 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
+          Back to Daily View
+        </a>
+      </div>
+    </div>
+
+    <div class="flex gap-4 text-xs text-gray-500 mt-2">
+      <span>{{ current_chat.participant1.email }}</span>
+      <span>{{ current_chat.participant2.email }}</span>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="space-y-4 max-h-96 overflow-y-auto">
+    {% for message in messages %}
+    <div class="flex {% if message.sender == current_chat.participant1 %}justify-start{% else %}justify-end{% endif %}">
+      <div
+        class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg {% if message.sender == current_chat.participant1 %}bg-gray-600 text-white{% else %}bg-ctpink-500 text-black{% endif %}">
+        <div class="text-sm font-medium mb-1">{{ message.sender.display_name }}</div>
+        <div class="text-sm">{{ message.content }}</div>
+        <div class="text-xs opacity-70 mt-1">{{ message.created_at|date:"H:i" }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-8 text-gray-500">
+      <p>No messages in this chat yet.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Bottom Navigation -->
+<div class="mt-6 flex justify-center gap-4">
+  {% if prev_chat_index is not None %}
+  <a
+    href="?date={{ target_date|date:'Y-m-d' }}&index={{ prev_chat_index }}"
+    class="px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-sm">
+    ← Previous Chat
+  </a>
+  {% endif %}
+
+  <a
+    href="{% url 'analytics:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
+    class="px-6 py-3 rounded-lg bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
+    View All Chats for This Day
+  </a>
+
+  {% if next_chat_index is not None %}
+  <a
+    href="?date={{ target_date|date:'Y-m-d' }}&index={{ next_chat_index }}"
+    class="px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-sm">
+    Next Chat →
+  </a>
+  {% endif %}
+</div>
+{% endif %} {% endblock %}

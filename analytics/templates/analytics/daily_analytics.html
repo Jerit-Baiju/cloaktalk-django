@@ -1,0 +1,219 @@
+{% extends 'analytics/base_analytics.html' %} {% block content %}
+<!-- Date Navigation Header -->
+<div class="flex items-center justify-between mb-6">
+  <div class="flex items-center gap-4">
+    <h1 class="text-2xl font-bold text-ctpink-400">Daily Analytics</h1>
+    <div class="text-lg text-gray-300">{{ target_date|date:"F j, Y" }}</div>
+  </div>
+
+  <!-- Date Navigation -->
+  <div class="flex items-center gap-2">
+    <a
+      href="{% url 'analytics:daily_analytics' %}?date={{ prev_date|date:'Y-m-d' }}"
+      class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+      </svg>
+      Previous Day
+    </a>
+
+    <form method="get" class="flex gap-2">
+      <input
+        type="date"
+        name="date"
+        value="{{ target_date|date:'Y-m-d' }}"
+        class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
+      <button type="submit" class="px-3 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold text-sm">Go</button>
+    </form>
+
+    {% if next_date <= today %}
+    <a
+      href="{% url 'analytics:daily_analytics' %}?date={{ next_date|date:'Y-m-d' }}"
+      class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2">
+      Next Day
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+      </svg>
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Daily Statistics KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">New Registrations</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ users_registered_count }}</div>
+    <div class="text-xs text-gray-500 mt-1">Users who signed up</div>
+  </div>
+
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Users with Chats</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ users_with_chats_count }}</div>
+    <div class="text-xs text-gray-500 mt-1">Users who chatted</div>
+  </div>
+
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">New Chats Started</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ chats_today_count }}</div>
+    <div class="text-xs text-gray-500 mt-1">Conversations begun</div>
+  </div>
+
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Messages Sent</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ messages_today_count }}</div>
+    <div class="text-xs text-gray-500 mt-1">Total messages</div>
+  </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+  <!-- Chats List (Main Content) -->
+  <div class="lg:col-span-3">
+    <div class="glass rounded-xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-lg">Chats Started on {{ target_date|date:"M j, Y" }}</h2>
+        <div class="flex items-center gap-3">
+          <div class="text-sm text-gray-400">{{ page_obj.paginator.count }} total chats</div>
+          {% if chats_today_count > 0 %}
+          <a
+            href="{% url 'analytics:daily_chat_reader' %}?date={{ target_date|date:'Y-m-d' }}"
+            class="px-3 py-1 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
+            Read Through All
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if page_obj %}
+      <div class="space-y-3">
+        {% for chat in page_obj %}
+        <div class="border border-white/10 rounded-lg p-4 hover:bg-white/5 transition-colors">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium text-ctpink-400 hover:underline">
+                  {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}
+                </a>
+                <span class="text-xs px-2 py-1 rounded bg-white/10 text-gray-300"> {{ chat.college.name }} </span>
+              </div>
+
+              <div class="flex items-center gap-4 text-sm text-gray-400">
+                <span>Started: {{ chat.created_at|date:"H:i" }}</span>
+                {% if chat.last_msg_at %}
+                <span>Last message: {{ chat.last_msg_at|date:"H:i" }}</span>
+                {% endif %}
+                <span>{{ chat.msgs }} message{{ chat.msgs|pluralize }}</span>
+              </div>
+
+              <div class="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                <span>{{ chat.participant1.email }}</span>
+                <span>{{ chat.participant2.email }}</span>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <a
+                href="{% url 'analytics:chat_detail' chat.id %}"
+                class="px-3 py-1 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
+                View
+              </a>
+              <a
+                href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}"
+                class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-sm">
+                Read
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.has_other_pages %}
+      <div class="flex justify-center mt-6">
+        <div class="flex gap-2">
+          {% if page_obj.has_previous %}
+          <a
+            href="?date={{ target_date|date:'Y-m-d' }}&page={{ page_obj.previous_page_number }}"
+            class="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
+            >Previous</a
+          >
+          {% endif %}
+
+          <span class="px-3 py-2 text-sm text-gray-400"> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
+
+          {% if page_obj.has_next %}
+          <a
+            href="?date={{ target_date|date:'Y-m-d' }}&page={{ page_obj.next_page_number }}"
+            class="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
+            >Next</a
+          >
+          {% endif %}
+        </div>
+      </div>
+      {% endif %} {% else %}
+      <div class="text-center py-8 text-gray-500">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.5"
+          stroke="currentColor"
+          class="w-12 h-12 mx-auto mb-4 text-gray-600">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        </svg>
+        <p>No chats were started on {{ target_date|date:"F j, Y" }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="lg:col-span-1 space-y-6">
+    <!-- New Users -->
+    {% if users_registered_count > 0 %}
+    <div class="glass rounded-xl p-5">
+      <h3 class="font-semibold mb-3">New Users ({{ users_registered_count }})</h3>
+      <div class="space-y-2">
+        {% for user in users_registered %}
+        <div class="text-sm">
+          <a href="{% url 'analytics:user_detail' user.id %}" class="text-ctpink-400 hover:underline">{{ user.display_name }}</a>
+          <div class="text-xs text-gray-500">{{ user.email }}</div>
+          <div class="text-xs text-gray-500">{{ user.created_at|date:"H:i" }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Day Navigation -->
+    <div class="glass rounded-xl p-5">
+      <h3 class="font-semibold mb-3">Recent Days with Activity</h3>
+      <div class="space-y-1">
+        {% for day_data in days_with_chats %}
+        <a
+          href="{% url 'analytics:daily_analytics' %}?date={{ day_data.day|date:'Y-m-d' }}"
+          class="block px-3 py-2 rounded text-sm hover:bg-white/10 {% if day_data.day.date == target_date %}bg-ctpink-500/20 text-ctpink-400{% endif %}">
+          <div class="flex justify-between">
+            <span>{{ day_data.day|date:"M j" }}</span>
+            <span class="text-gray-400">{{ day_data.chat_count }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-white/10">
+        <a
+          href="{% url 'analytics:daily_analytics' %}"
+          class="block px-3 py-2 rounded text-sm text-center bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30">
+          Today
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

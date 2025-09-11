@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
@@ -7,6 +7,7 @@ from django.db.models import Count, F, Max, Q
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from base.models import Chat, Message
 
@@ -247,3 +248,158 @@ def user_detail(request, user_id: int):
             "recent_chats": recent_chats,
         },
     )
+
+
+@staff_member_required
+def daily_analytics(request):
+    """Daily analytics showing registrations, chats, and chat navigation for a specific day."""
+    # Get the target date from query params, default to today
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = timezone.now().date()
+    else:
+        target_date = timezone.now().date()
+    
+    # Calculate previous and next days for navigation
+    prev_date = target_date - timedelta(days=1)
+    next_date = target_date + timedelta(days=1)
+    today = timezone.now().date()
+    
+    # Users registered on this day
+    users_registered = User.objects.filter(created_at__date=target_date)
+    users_registered_count = users_registered.count()
+    
+    # Chats created on this day
+    chats_today = Chat.objects.filter(created_at__date=target_date).select_related(
+        'participant1', 'participant2', 'college'
+    ).annotate(
+        msgs=Count('messages'),
+        last_msg_at=Max('messages__created_at')
+    ).order_by('created_at')
+    
+    chats_today_count = chats_today.count()
+    
+    # Users who had chats on this day (either started a chat or participated in one)
+    users_with_chats = User.objects.filter(
+        Q(chats_as_participant1__created_at__date=target_date) |
+        Q(chats_as_participant2__created_at__date=target_date)
+    ).distinct()
+    users_with_chats_count = users_with_chats.count()
+    
+    # Messages sent on this day
+    messages_today = Message.objects.filter(created_at__date=target_date)
+    messages_today_count = messages_today.count()
+    
+    # Pagination for chats
+    paginator = Paginator(chats_today, 20)
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    
+    # Days with data for quick navigation
+    days_with_chats = Chat.objects.annotate(
+        day=TruncDate('created_at')
+    ).values('day').annotate(
+        chat_count=Count('id')
+    ).order_by('-day')[:30]  # Last 30 days with data
+    
+    context = {
+        'target_date': target_date,
+        'prev_date': prev_date,
+        'next_date': next_date,
+        'today': today,
+        'users_registered_count': users_registered_count,
+        'users_registered': users_registered,
+        'chats_today_count': chats_today_count,
+        'users_with_chats_count': users_with_chats_count,
+        'messages_today_count': messages_today_count,
+        'page_obj': page_obj,
+        'days_with_chats': days_with_chats,
+    }
+    
+    return render(request, 'analytics/daily_analytics.html', context)
+
+
+@staff_member_required
+def daily_chat_reader(request):
+    """Read through chats day by day with navigation."""
+    # Get the target date from query params, default to today
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            target_date = timezone.now().date()
+    else:
+        target_date = timezone.now().date()
+    
+    # Get chat index for navigation within the day
+    chat_index = int(request.GET.get('index', 0))
+    
+    # Get all chats for this day
+    chats_today = Chat.objects.filter(
+        created_at__date=target_date
+    ).select_related('participant1', 'participant2', 'college').order_by('created_at')
+    
+    total_chats = chats_today.count()
+    
+    if total_chats == 0:
+        # No chats for this day, try to find the next day with chats
+        next_day_with_chats = Chat.objects.filter(
+            created_at__date__gt=target_date
+        ).annotate(day=TruncDate('created_at')).values('day').distinct().order_by('day').first()
+        
+        prev_day_with_chats = Chat.objects.filter(
+            created_at__date__lt=target_date
+        ).annotate(day=TruncDate('created_at')).values('day').distinct().order_by('-day').first()
+        
+        return render(request, 'analytics/daily_chat_reader.html', {
+            'target_date': target_date,
+            'total_chats': 0,
+            'next_day_with_chats': next_day_with_chats['day'] if next_day_with_chats else None,
+            'prev_day_with_chats': prev_day_with_chats['day'] if prev_day_with_chats else None,
+        })
+    
+    # Ensure chat_index is within bounds
+    if chat_index >= total_chats:
+        chat_index = total_chats - 1
+    elif chat_index < 0:
+        chat_index = 0
+    
+    current_chat = chats_today[chat_index]
+    messages = current_chat.messages.select_related('sender').all()
+    
+    # Navigation within day
+    next_chat_index = chat_index + 1 if chat_index + 1 < total_chats else None
+    prev_chat_index = chat_index - 1 if chat_index > 0 else None
+    
+    # Navigation to other days
+    prev_date = target_date - timedelta(days=1)
+    next_date = target_date + timedelta(days=1)
+    today = timezone.now().date()
+    
+    # Find days with chats for navigation
+    prev_day_with_chats = Chat.objects.filter(
+        created_at__date__lt=target_date
+    ).annotate(day=TruncDate('created_at')).values('day').distinct().order_by('-day').first()
+    
+    next_day_with_chats = Chat.objects.filter(
+        created_at__date__gt=target_date
+    ).annotate(day=TruncDate('created_at')).values('day').distinct().order_by('day').first()
+    
+    context = {
+        'target_date': target_date,
+        'chat_index': chat_index,
+        'total_chats': total_chats,
+        'current_chat': current_chat,
+        'messages': messages,
+        'next_chat_index': next_chat_index,
+        'prev_chat_index': prev_chat_index,
+        'prev_day_with_chats': prev_day_with_chats['day'] if prev_day_with_chats else None,
+        'next_day_with_chats': next_day_with_chats['day'] if next_day_with_chats else None,
+        'today': today,
+    }
+    
+    return render(request, 'analytics/daily_chat_reader.html', context)
