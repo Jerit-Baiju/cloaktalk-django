@@ -1,5 +1,6 @@
-from typing import Optional, Tuple
 from datetime import datetime
+from typing import Optional, Tuple
+
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -46,26 +47,26 @@ class MatchingService:
         1. Fresh users (who haven't chatted with anyone in queue)
         2. Users who haven't chatted with each other
         3. If all have chatted, pick oldest chat pair after 5 seconds wait
-        
+
         Returns tuple of (user1, user2) if match found, None otherwise.
         """
         waiting_entries = WaitingListEntry.objects.filter(college=college).select_related("user").order_by("created_at")
-        
+
         if len(waiting_entries) < 2:
             return None
-            
+
         users = [entry.user for entry in waiting_entries]
-        
+
         # Strategy 1: Find pairs where at least one user is completely fresh (never chatted)
         fresh_users = []
         experienced_users = []
-        
+
         for user in users:
             if cls.has_any_chat_history(user):
                 experienced_users.append(user)
             else:
                 fresh_users.append(user)
-        
+
         # If we have at least one fresh user, pair them with anyone
         if fresh_users:
             if len(fresh_users) >= 2:
@@ -75,94 +76,91 @@ class MatchingService:
                 # One fresh user, pair with any experienced user
                 if experienced_users:
                     return (fresh_users[0], experienced_users[0])
-        
+
         # Strategy 2: All users have some chat history, find pairs who haven't chatted together
         for i, user1 in enumerate(experienced_users):
-            for user2 in experienced_users[i+1:]:
+            for user2 in experienced_users[i + 1 :]:
                 if not cls.have_users_chatted_before(user1, user2):
                     return (user1, user2)
-        
+
         # Strategy 3: All users have chatted with each other before
         # Check if enough time has passed (5 seconds) since they joined queue
         now = timezone.now()
-        
+
         # Find the pair with the oldest most recent chat
         best_pair = None
         oldest_chat_time = None
-        
+
         for i, user1 in enumerate(experienced_users):
             user1_entry = next(entry for entry in waiting_entries if entry.user == user1)
-            
+
             # Check if user1 has been waiting for at least 5 seconds
             if (now - user1_entry.created_at).total_seconds() < 5:
                 continue
-                
-            for user2 in experienced_users[i+1:]:
+
+            for user2 in experienced_users[i + 1 :]:
                 user2_entry = next(entry for entry in waiting_entries if entry.user == user2)
-                
+
                 # Check if user2 has been waiting for at least 5 seconds
                 if (now - user2_entry.created_at).total_seconds() < 5:
                     continue
-                
+
                 # Find their most recent chat together
                 most_recent_chat_time = cls.get_most_recent_chat_time(user1, user2)
-                
+
                 if oldest_chat_time is None or (most_recent_chat_time and most_recent_chat_time < oldest_chat_time):
                     oldest_chat_time = most_recent_chat_time
                     best_pair = (user1, user2)
-        
+
         return best_pair
 
     @classmethod
     def has_any_chat_history(cls, user: User) -> bool:
         """Check if user has any chat history at all."""
-        return Chat.objects.filter(
-            Q(participant1=user) | Q(participant2=user)
-        ).exists()
-    
+        return Chat.objects.filter(Q(participant1=user) | Q(participant2=user)).exists()
+
     @classmethod
     def have_users_chatted_before(cls, user1: User, user2: User) -> bool:
         """Check if two users have had any chat together before."""
         return Chat.objects.filter(
-            (Q(participant1=user1) & Q(participant2=user2)) |
-            (Q(participant1=user2) & Q(participant2=user1))
+            (Q(participant1=user1) & Q(participant2=user2)) | (Q(participant1=user2) & Q(participant2=user1))
         ).exists()
-    
+
     @classmethod
     def get_most_recent_chat_time(cls, user1: User, user2: User) -> Optional[datetime]:
         """Get the creation time of the most recent chat between two users."""
-        most_recent_chat = Chat.objects.filter(
-            (Q(participant1=user1) & Q(participant2=user2)) |
-            (Q(participant1=user2) & Q(participant2=user1))
-        ).order_by('-created_at').first()
-        
+        most_recent_chat = (
+            Chat.objects.filter(
+                (Q(participant1=user1) & Q(participant2=user2)) | (Q(participant1=user2) & Q(participant2=user1))
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
         return most_recent_chat.created_at if most_recent_chat else None
 
     @classmethod
     def get_queue_waiting_stats(cls, college: College) -> dict:
         """Get statistics about users waiting in queue."""
         waiting_entries = WaitingListEntry.objects.filter(college=college).select_related("user").order_by("created_at")
-        
+
         if not waiting_entries:
             return {
-                'total_waiting': 0,
-                'fresh_users': 0,
-                'experienced_users': 0,
-                'ready_for_matching': False,
-                'users_waiting_over_5_seconds': 0
+                "total_waiting": 0,
+                "fresh_users": 0,
+                "experienced_users": 0,
+                "ready_for_matching": False,
+                "users_waiting_over_5_seconds": 0,
             }
-        
+
         users = [entry.user for entry in waiting_entries]
         fresh_users = sum(1 for user in users if not cls.has_any_chat_history(user))
         experienced_users = len(users) - fresh_users
-        
+
         # Count users who have been waiting over 5 seconds
         now = timezone.now()
-        users_waiting_over_5_seconds = sum(
-            1 for entry in waiting_entries 
-            if (now - entry.created_at).total_seconds() >= 5
-        )
-        
+        users_waiting_over_5_seconds = sum(1 for entry in waiting_entries if (now - entry.created_at).total_seconds() >= 5)
+
         # Check if matching is possible
         ready_for_matching = False
         if len(users) >= 2:
@@ -173,19 +171,19 @@ class MatchingService:
             else:
                 # Check if any pair hasn't chatted before
                 for i, user1 in enumerate(users):
-                    for user2 in users[i+1:]:
+                    for user2 in users[i + 1 :]:
                         if not cls.have_users_chatted_before(user1, user2):
                             ready_for_matching = True
                             break
                     if ready_for_matching:
                         break
-        
+
         return {
-            'total_waiting': len(users),
-            'fresh_users': fresh_users,
-            'experienced_users': experienced_users,
-            'ready_for_matching': ready_for_matching,
-            'users_waiting_over_5_seconds': users_waiting_over_5_seconds
+            "total_waiting": len(users),
+            "fresh_users": fresh_users,
+            "experienced_users": experienced_users,
+            "ready_for_matching": ready_for_matching,
+            "users_waiting_over_5_seconds": users_waiting_over_5_seconds,
         }
 
     @classmethod
@@ -213,7 +211,7 @@ class MatchingService:
         Try to match users in the waiting list for a college.
         Returns Chat object if successful match, None otherwise.
         """
-    # Keep attempting to find a valid pair (defensive against stale entries)
+        # Keep attempting to find a valid pair (defensive against stale entries)
 
         while True:
             match = cls.find_match(college)

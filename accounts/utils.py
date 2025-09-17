@@ -49,4 +49,3 @@ def get_domain_from_email(email: str) -> str:
 
     # single-label host (rare) - return as-is
     return labels[0]
-

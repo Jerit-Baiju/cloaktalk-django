@@ -18,7 +18,7 @@ def _format_time_field(t: Any) -> str:
     if isinstance(t, str):
         return t
     try:
-        return t.strftime('%H:%M:%S')
+        return t.strftime("%H:%M:%S")
     except Exception:
         return str(t)
 
@@ -33,7 +33,7 @@ class CollegeAccessView(APIView):
 
     def get(self, request):
         user = request.user
-        
+
         # Debug logging
         print(f"CollegeAccessView: User authenticated: {user.is_authenticated}")
         print(f"CollegeAccessView: User: {user}")
@@ -41,9 +41,9 @@ class CollegeAccessView(APIView):
         print(f"CollegeAccessView: Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'MISSING')}")
         print(f"CollegeAccessView: Content-Type: {request.META.get('CONTENT_TYPE', 'MISSING')}")
         print(f"CollegeAccessView: HTTP_HOST: {request.META.get('HTTP_HOST', 'MISSING')}")
-        if hasattr(user, 'college'):
+        if hasattr(user, "college"):
             print(f"CollegeAccessView: User college: {user.college}")
-        
+
         # Check if user has a college
         if not user.college:
             # Auto-assign college based on email domain
@@ -68,8 +68,8 @@ class CollegeAccessView(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
-                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),  # Default 9 PM
+                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
@@ -187,8 +187,8 @@ class CollegeStatusView(APIView):
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start=datetime.strptime('20:00:00', '%H:%M:%S').time(),  # Default 8 PM
-                    window_end=datetime.strptime('21:00:00', '%H:%M:%S').time(),  # Default 9 PM
+                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
@@ -244,12 +244,14 @@ def queue_status(request):
     waiting_count = MatchingService.get_waiting_count(user.college)
     is_in_queue = WaitingListEntry.objects.filter(user=user, college=user.college).exists()
 
-    return Response({
-        "waiting_count": waiting_count,
-        "college": user.college.name,
-        "college_id": user.college.id,
-        "is_in_queue": is_in_queue,
-    })
+    return Response(
+        {
+            "waiting_count": waiting_count,
+            "college": user.college.name,
+            "college_id": user.college.id,
+            "is_in_queue": is_in_queue,
+        }
+    )
 
 
 @api_view(["GET"])  # New endpoint
@@ -435,17 +437,17 @@ def end_chat(request, chat_id):
 
 class HomepageView(View):
     """Homepage view with feedback form"""
-    
+
     def get(self, request):
-        return render(request, 'homepage.html')
-    
+        return render(request, "homepage.html")
+
     def post(self, request):
-        comments = request.POST.get('comments', '').strip()
-        
+        comments = request.POST.get("comments", "").strip()
+
         if comments:
             Feedback.objects.create(comments=comments)
-            messages.success(request, 'Thank you for your feedback!')
+            messages.success(request, "Thank you for your feedback!")
         else:
-            messages.error(request, 'Please provide some feedback before submitting.')
-            
-        return redirect('homepage')
+            messages.error(request, "Please provide some feedback before submitting.")
+
+        return redirect("homepage")
