@@ -321,8 +321,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        # Send recent messages
-        await self.send_recent_messages()
+        # Messages are already sent via the API call when the frontend connects
+        # No need to send them again here to avoid duplication
 
     async def get_user_from_token(self):
         """Extract and validate JWT token from query parameters."""
@@ -415,27 +415,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Broadcast typing indicator to other participants."""
         event_type = "typing_start" if is_typing else "typing_stop"
         await self.channel_layer.group_send(self.room_group_name, {"type": event_type, "user_id": str(self.user.id)})
-
-    async def send_recent_messages(self):
-        """Send recent messages to the connected user."""
-        messages = await database_sync_to_async(list)(
-            Message.objects.filter(chat=self.chat).select_related("sender").order_by("-created_at")[:50]
-        )
-
-        for message in reversed(messages):
-            await self.send(
-                text_data=json.dumps(
-                    {
-                        "type": "message",
-                        "message_id": str(message.id),
-                        "content": message.content,
-                        "sender_id": str(message.sender.id) if message.sender else None,
-                        "message_type": message.message_type,
-                        "timestamp": message.created_at.isoformat(),
-                        "is_own": message.sender == self.user if message.sender else False,
-                    }
-                )
-            )
 
     async def chat_message(self, event):
         """Handle chat message events."""
