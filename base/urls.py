@@ -14,4 +14,7 @@ urlpatterns = [
     path("chat/active/", views.get_active_chat, name="get_active_chat"),
     path("chat/<uuid:chat_id>/", views.get_chat, name="get_chat"),
     path("chat/<uuid:chat_id>/end/", views.end_chat, name="end_chat"),
+    # Confession endpoints
+    path("confessions/", views.list_confessions, name="list_confessions"),
+    path("confessions/create/", views.create_confession, name="create_confession"),
 ]

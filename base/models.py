@@ -81,3 +81,31 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"Feedback - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class Confession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    content = models.TextField()
+    author = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="confessions")
+    college = models.ForeignKey(College, on_delete=models.CASCADE, related_name="confessions")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Many-to-many fields for likes and dislikes
+    liked_by = models.ManyToManyField("accounts.User", related_name="liked_confessions", blank=True)
+    disliked_by = models.ManyToManyField("accounts.User", related_name="disliked_confessions", blank=True)
+
+    class Meta:
+        db_table = "confessions"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Confession by {self.author.email} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+    
+    @property
+    def likes_count(self):
+        return self.liked_by.count()
+    
+    @property
+    def dislikes_count(self):
+        return self.disliked_by.count()

@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from base.models import College, Feedback
+from base.models import College, Feedback, Confession
 
 
 def _format_time_field(t: Any) -> str:
@@ -451,3 +451,77 @@ class HomepageView(View):
             messages.error(request, "Please provide some feedback before submitting.")
 
         return redirect("homepage")
+
+
+# Confession Views
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_confessions(request):
+    """List confessions from the user's college."""
+    user = request.user
+    
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get confessions from the same college, ordered by creation time (newest first)
+    confessions = Confession.objects.filter(college=user.college).select_related("author", "college").prefetch_related("liked_by", "disliked_by")
+    
+    confession_data = []
+    for confession in confessions:
+        # Check if current user has liked/disliked this confession
+        user_liked = confession.liked_by.filter(id=user.id).exists()
+        user_disliked = confession.disliked_by.filter(id=user.id).exists()
+        
+        confession_data.append({
+            "id": str(confession.id),
+            "content": confession.content,
+            "created_at": confession.created_at.isoformat(),
+            "likes_count": confession.likes_count,
+            "dislikes_count": confession.dislikes_count,
+            "user_liked": user_liked,
+            "user_disliked": user_disliked,
+            "is_own": confession.author == user,
+        })
+    
+    return Response({
+        "confessions": confession_data,
+        "college": user.college.name,
+        "total_count": len(confession_data)
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_confession(request):
+    """Create a new confession."""
+    user = request.user
+    
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    content = request.data.get("content", "").strip()
+    
+    if not content:
+        return Response({"error": "Confession content is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if len(content) > 1000:  # Set a reasonable limit
+        return Response({"error": "Confession content too long (max 1000 characters)"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Create the confession
+    confession = Confession.objects.create(
+        content=content,
+        author=user,
+        college=user.college
+    )
+    
+    return Response({
+        "id": str(confession.id),
+        "content": confession.content,
+        "created_at": confession.created_at.isoformat(),
+        "likes_count": 0,
+        "dislikes_count": 0,
+        "user_liked": False,
+        "user_disliked": False,
+        "is_own": True,
+        "message": "Confession created successfully"
+    }, status=status.HTTP_201_CREATED)
