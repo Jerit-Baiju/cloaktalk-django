@@ -435,6 +435,81 @@ def end_chat(request, chat_id):
         return Response({"error": "Chat not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+# Confession Views
+from base.models import Confession
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def confession_list(request):
+    """Get list of confessions from user's college."""
+    user = request.user
+    
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Filter confessions by user's college
+    confessions = Confession.objects.filter(college=user.college).select_related("author", "college")
+    
+    confession_data = []
+    for confession in confessions:
+        confession_data.append({
+            "id": str(confession.id),
+            "confession": confession.confession,
+            "author_name": confession.author.display_name,
+            "college_name": confession.college.name,
+            "likes_count": confession.likes_count,
+            "dislikes_count": confession.dislikes_count,
+            "user_liked": user in confession.likes.all(),
+            "user_disliked": user in confession.dislikes.all(),
+            "created_at": confession.created_at.isoformat(),
+        })
+    
+    return Response({
+        "confessions": confession_data,
+        "total_count": len(confession_data)
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_confession(request):
+    """Create a new confession."""
+    user = request.user
+    
+    if not user.college:
+        return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    confession_text = request.data.get("confession", "").strip()
+    
+    if not confession_text:
+        return Response({"error": "Confession text is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if len(confession_text) > 1000:  # Reasonable limit
+        return Response({"error": "Confession text too long (max 1000 characters)"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    confession = Confession.objects.create(
+        confession=confession_text,
+        author=user,
+        college=user.college
+    )
+    
+    return Response({
+        "message": "Confession created successfully",
+        "confession": {
+            "id": str(confession.id),
+            "confession": confession.confession,
+            "author_name": confession.author.display_name,
+            "college_name": confession.college.name,
+            "likes_count": 0,
+            "dislikes_count": 0,
+            "user_liked": False,
+            "user_disliked": False,
+            "created_at": confession.created_at.isoformat(),
+        }
+    }, status=status.HTTP_201_CREATED)
+
+
 class HomepageView(View):
     """Homepage view with feedback form"""
 
