@@ -45,8 +45,7 @@
 
 <div class="glass rounded-xl p-4">
   <div class="space-y-4">
-    {% for m in messages %} {% if (not swap and m.sender_id == chat.participant1_id) or (swap and m.sender_id == chat.participant2_id)
-    %}
+    {% for m in messages %} {% if (not swap and m.sender_id == chat.participant1_id) or (swap and m.sender_id == chat.participant2_id) %}
     <!-- Left bubble -->
     <div class="flex items-start gap-3">
       <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs">A</div>
