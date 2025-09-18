@@ -1,0 +1,140 @@
+{% extends 'analytics/base_analytics.html' %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">{{ college.name }}</h1>
+    <div class="text-sm text-gray-400">Domain: {{ college.domain }}</div>
+  </div>
+  <a href="{% url 'analytics:colleges_list' %}" class="text-ctpink-400">Back to Colleges</a>
+</div>
+
+<!-- KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Total Messages</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ messages_count }}</div>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Users</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ users_count }}</div>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Chats</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ chats_count }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="mt-6">
+  <div class="glass rounded-xl p-4 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[220px]">
+      <label class="block text-xs text-gray-400 mb-1">Search</label>
+      <input name="q" value="{{ q }}" placeholder="Search users by name/email or chat participants" class="w-full bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-xs text-gray-400 mb-1">Sort Users</label>
+      <select name="sort_users" class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm">
+        <option value="-messages_sent" {% if sort_users == '-messages_sent' %}selected{% endif %}>Most messages</option>
+        <option value="messages_sent" {% if sort_users == 'messages_sent' %}selected{% endif %}>Least messages</option>
+        <option value="-chats_count" {% if sort_users == '-chats_count' %}selected{% endif %}>Most chats</option>
+        <option value="chats_count" {% if sort_users == 'chats_count' %}selected{% endif %}>Least chats</option>
+        <option value="name" {% if sort_users == 'name' %}selected{% endif %}>Name A-Z</option>
+        <option value="-name" {% if sort_users == '-name' %}selected{% endif %}>Name Z-A</option>
+        <option value="created_at" {% if sort_users == 'created_at' %}selected{% endif %}>Oldest</option>
+        <option value="-created_at" {% if sort_users == '-created_at' %}selected{% endif %}>Newest</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-400 mb-1">Sort Chats</label>
+      <select name="sort_chats" class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm">
+        <option value="-last_msg_at" {% if sort_chats == '-last_msg_at' %}selected{% endif %}>Most recent message</option>
+        <option value="last_msg_at" {% if sort_chats == 'last_msg_at' %}selected{% endif %}>Least recent message</option>
+        <option value="-msgs" {% if sort_chats == '-msgs' %}selected{% endif %}>Most messages</option>
+        <option value="msgs" {% if sort_chats == 'msgs' %}selected{% endif %}>Least messages</option>
+        <option value="-created_at" {% if sort_chats == '-created_at' %}selected{% endif %}>Newest chat</option>
+        <option value="created_at" {% if sort_chats == 'created_at' %}selected{% endif %}>Oldest chat</option>
+      </select>
+    </div>
+    <div>
+      <button class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">Apply</button>
+    </div>
+  </div>
+</form>
+
+<!-- Two-column layout: Users and Chats -->
+<div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+  <!-- Users list -->
+  <div class="glass rounded-xl">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between">
+      <h2 class="font-semibold">Users</h2>
+      <div class="text-sm text-gray-400">{{ users_page_obj.paginator.count }} total</div>
+    </div>
+    <ul class="divide-y divide-white/5">
+      {% for u in users_page_obj %}
+      <li class="p-4 flex items-center justify-between">
+        <div class="text-sm">
+          <a href="{% url 'analytics:user_detail' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
+          <div class="text-xs text-gray-400">{{ u.email }}</div>
+        </div>
+        <div class="text-right text-xs">
+          <div><span class="text-gray-400">Msgs:</span> <span class="text-ctpink-400 font-semibold">{{ u.messages_sent }}</span></div>
+          <div><span class="text-gray-400">Chats:</span> <span class="text-ctpink-400 font-semibold">{{ u.chats_count }}</span></div>
+        </div>
+      </li>
+      {% empty %}
+      <li class="p-6 text-center text-gray-500">No users</li>
+      {% endfor %}
+    </ul>
+    {% if users_page_obj.paginator.num_pages > 1 %}
+    <div class="p-4 border-t border-white/10 flex items-center justify-between text-sm">
+      <div>Page {{ users_page_obj.number }} of {{ users_page_obj.paginator.num_pages }}</div>
+      <div class="space-x-2">
+        {% if users_page_obj.has_previous %}
+        <a href="?q={{ q }}&sort_users={{ sort_users }}&sort_chats={{ sort_chats }}&users_page={{ users_page_obj.previous_page_number }}&chats_page={{ chats_page_obj.number }}" class="px-3 py-1 bg-white/10 rounded">Prev</a>
+        {% endif %}
+        {% if users_page_obj.has_next %}
+        <a href="?q={{ q }}&sort_users={{ sort_users }}&sort_chats={{ sort_chats }}&users_page={{ users_page_obj.next_page_number }}&chats_page={{ chats_page_obj.number }}" class="px-3 py-1 bg-white/10 rounded">Next</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Chats list -->
+  <div class="glass rounded-xl">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between">
+      <h2 class="font-semibold">Chats</h2>
+      <div class="text-sm text-gray-400">{{ chats_page_obj.paginator.count }} total</div>
+    </div>
+    <ul class="divide-y divide-white/5">
+      {% for chat in chats_page_obj %}
+      <li class="p-4 flex items-center justify-between">
+        <div class="text-sm">
+          <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium hover:underline">{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a>
+          <div class="text-xs text-gray-400">Created {{ chat.created_at|date:'Y-m-d H:i' }}</div>
+        </div>
+        <div class="text-right text-xs">
+          <div><span class="text-gray-400">Msgs:</span> <span class="text-ctpink-400 font-semibold">{{ chat.msgs }}</span></div>
+          <div><span class="text-gray-400">Last:</span> <span class="text-ctpink-400 font-semibold">{{ chat.last_msg_at|default:'—' }}</span></div>
+        </div>
+      </li>
+      {% empty %}
+      <li class="p-6 text-center text-gray-500">No chats</li>
+      {% endfor %}
+    </ul>
+    {% if chats_page_obj.paginator.num_pages > 1 %}
+    <div class="p-4 border-t border-white/10 flex items-center justify-between text-sm">
+      <div>Page {{ chats_page_obj.number }} of {{ chats_page_obj.paginator.num_pages }}</div>
+      <div class="space-x-2">
+        {% if chats_page_obj.has_previous %}
+        <a href="?q={{ q }}&sort_users={{ sort_users }}&sort_chats={{ sort_chats }}&users_page={{ users_page_obj.number }}&chats_page={{ chats_page_obj.previous_page_number }}" class="px-3 py-1 bg-white/10 rounded">Prev</a>
+        {% endif %}
+        {% if chats_page_obj.has_next %}
+        <a href="?q={{ q }}&sort_users={{ sort_users }}&sort_chats={{ sort_chats }}&users_page={{ users_page_obj.number }}&chats_page={{ chats_page_obj.next_page_number }}" class="px-3 py-1 bg-white/10 rounded">Next</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

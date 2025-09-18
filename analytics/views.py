@@ -9,7 +9,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from base.models import Chat, Message
+from base.models import Chat, College, Message
 
 User = get_user_model()
 
@@ -407,8 +407,6 @@ def daily_chat_reader(request):
     prev_chat_index = chat_index - 1 if chat_index > 0 else None
 
     # Navigation to other days
-    prev_date = target_date - timedelta(days=1)
-    next_date = target_date + timedelta(days=1)
     today = timezone.now().date()
 
     # Find days with chats for navigation
@@ -444,3 +442,128 @@ def daily_chat_reader(request):
     }
 
     return render(request, "analytics/daily_chat_reader.html", context)
+
+
+@staff_member_required
+def colleges_list(request):
+    """Overview list of colleges with basic aggregates and quick navigation."""
+    q = request.GET.get("q")
+
+    colleges = College.objects.all()
+    if q:
+        colleges = colleges.filter(Q(name__icontains=q) | Q(domain__icontains=q))
+
+    # Aggregates
+    users_per_college = (
+        User.objects.filter(college__isnull=False)
+        .values("college_id")
+        .annotate(user_count=Count("id"))
+    )
+    users_map = {row["college_id"]: row["user_count"] for row in users_per_college}
+
+    chats_per_college = Chat.objects.values("college_id").annotate(chat_count=Count("id"))
+    chats_map = {row["college_id"]: row["chat_count"] for row in chats_per_college}
+
+    msgs_per_college = (
+        Message.objects.values("chat__college_id").annotate(msg_count=Count("id"))
+    )
+    msgs_map = {row["chat__college_id"]: row["msg_count"] for row in msgs_per_college}
+
+    # Build list with aggregates
+    items = []
+    for college in colleges.order_by("name"):
+        items.append(
+            {
+                "college": college,
+                "user_count": users_map.get(college.id, 0),
+                "chat_count": chats_map.get(college.id, 0),
+                "msg_count": msgs_map.get(college.id, 0),
+            }
+        )
+
+    return render(request, "analytics/colleges_list.html", {"items": items, "q": q})
+
+
+@staff_member_required
+def college_detail(request, college_id: int):
+    """College specific analytics: message count, users count + list, chats count + list."""
+    college = get_object_or_404(College, pk=college_id)
+
+    # Filters and sorting
+    q = request.GET.get("q")
+    sort_chats = request.GET.get("sort_chats", "-last_msg_at")
+    sort_users = request.GET.get("sort_users", "-messages_sent")
+
+    # Users for this college
+    users_qs = (
+        User.objects.filter(college=college)
+        .annotate(
+            c1=Count("chats_as_participant1", distinct=True),
+            c2=Count("chats_as_participant2", distinct=True),
+            messages_sent=Count("message", distinct=True),
+        )
+        .annotate(chats_count=F("c1") + F("c2"))
+    )
+    if q:
+        users_qs = users_qs.filter(Q(name__icontains=q) | Q(email__icontains=q) | Q(username__icontains=q))
+
+    allowed_user_sorts = {
+        "created_at",
+        "-created_at",
+        "chats_count",
+        "-chats_count",
+        "messages_sent",
+        "-messages_sent",
+        "name",
+        "-name",
+    }
+    if sort_users not in allowed_user_sorts:
+        sort_users = "-messages_sent"
+    users_qs = users_qs.order_by(sort_users)
+
+    users_count = users_qs.count()
+
+    # Chats for this college
+    chats_qs = (
+        Chat.objects.filter(college=college)
+        .select_related("participant1", "participant2", "college")
+        .annotate(last_msg_at=Max("messages__created_at"), msgs=Count("messages"))
+    )
+    if q:
+        chats_qs = chats_qs.filter(
+            Q(participant1__name__icontains=q)
+            | Q(participant1__email__icontains=q)
+            | Q(participant2__name__icontains=q)
+            | Q(participant2__email__icontains=q)
+        )
+
+    allowed_chat_sorts = {"created_at", "-created_at", "msgs", "-msgs", "last_msg_at", "-last_msg_at"}
+    if sort_chats not in allowed_chat_sorts:
+        sort_chats = "-last_msg_at"
+    chats_qs = chats_qs.order_by(sort_chats)
+
+    chats_count = chats_qs.count()
+
+    # Message count for this college
+    messages_count = Message.objects.filter(chat__college=college).count()
+
+    # Pagination
+    users_paginator = Paginator(users_qs, 25)
+    users_page_obj = users_paginator.get_page(request.GET.get("users_page"))
+
+    chats_paginator = Paginator(chats_qs, 25)
+    chats_page_obj = chats_paginator.get_page(request.GET.get("chats_page"))
+
+    context = {
+        "college": college,
+        "messages_count": messages_count,
+        "users_count": users_count,
+        "chats_count": chats_count,
+        "users_page_obj": users_page_obj,
+        "chats_page_obj": chats_page_obj,
+        "sort_users": sort_users,
+        "sort_chats": sort_chats,
+        "q": q,
+    }
+
+    return render(request, "analytics/college_detail.html", context)

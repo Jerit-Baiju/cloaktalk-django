@@ -19,4 +19,8 @@ urlpatterns = [
     path("users/", views.users_list, name="users_list"),
     path("users/<int:user_id>/", views.user_detail, name="user_detail"),
     path("users/<int:user_id>/chats/", views.user_chats, name="user_chats"),
+
+    # College focused views
+    path("colleges/", views.colleges_list, name="colleges_list"),
+    path("colleges/<int:college_id>/", views.college_detail, name="college_detail"),
 ]
