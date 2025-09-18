@@ -15,7 +15,7 @@
   </a>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
   <!-- KPIs -->
   <div class="glass rounded-xl p-5">
     <div class="text-sm text-gray-400">Total Users</div>
@@ -32,6 +32,10 @@
   <div class="glass rounded-xl p-5">
     <div class="text-sm text-gray-400">Active Chats</div>
     <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.active_chats }}</div>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="text-sm text-gray-400">Colleges</div>
+    <div class="mt-1 text-3xl font-bold text-ctpink-400">{{ kpis.total_colleges_with_students }}</div>
   </div>
 </div>
 
@@ -69,7 +73,7 @@
 </div>
 
 <!-- Top Chats & Users -->
-<div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
   <div class="glass rounded-xl p-5">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Top Chats by Messages</h2>
@@ -104,6 +108,25 @@
       </li>
       {% empty %}
       <li class="py-4 text-gray-500">No users</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="glass rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold">Students by College</h2>
+      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:users_list' %}">View All</a>
+    </div>
+    <ul class="mt-4 divide-y divide-white/5">
+      {% for college in college_registrations %}
+      <li class="py-3 flex items-center justify-between">
+        <div class="text-sm text-gray-300">
+          <div class="font-medium">{{ college.college__name }}</div>
+          <div class="text-xs text-gray-400">Registered Students</div>
+        </div>
+        <div class="text-ctpink-400 font-semibold">{{ college.student_count }}</div>
+      </li>
+      {% empty %}
+      <li class="py-4 text-gray-500">No college registrations</li>
       {% endfor %}
     </ul>
   </div>

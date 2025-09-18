@@ -52,6 +52,7 @@ def analytics_dashboard(request):
     total_chats = chats.count()
     total_messages = messages.count()
     active_chats = chats.filter(is_active=True).count()
+    total_colleges_with_students = users.filter(college__isnull=False).values("college").distinct().count()
 
     chats_by_day = chats.annotate(day=TruncDate("created_at")).values("day").annotate(c=Count("id")).order_by("day")
     chats_by_month = chats.annotate(month=TruncMonth("created_at")).values("month").annotate(c=Count("id")).order_by("month")
@@ -59,17 +60,28 @@ def analytics_dashboard(request):
     chat_message_counts = chats.annotate(msgs=Count("messages")).order_by("-msgs")[:20]
     top_users = users.annotate(msgs=Count("message")).order_by("-msgs")[:20]
 
+    # College registration statistics
+    college_registrations = (
+        users.select_related("college")
+        .values("college__name", "college__id")
+        .annotate(student_count=Count("id"))
+        .filter(college__isnull=False)
+        .order_by("-student_count")
+    )
+
     context = {
         "kpis": {
             "total_users": total_users,
             "total_chats": total_chats,
             "total_messages": total_messages,
             "active_chats": active_chats,
+            "total_colleges_with_students": total_colleges_with_students,
         },
         "chats_by_day": list(chats_by_day),
         "chats_by_month": list(chats_by_month),
         "chat_message_counts": chat_message_counts,
         "top_users": top_users,
+        "college_registrations": college_registrations,
     }
     return render(request, "analytics/dashboard.html", context)
 

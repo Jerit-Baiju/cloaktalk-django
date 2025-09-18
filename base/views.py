@@ -271,12 +271,17 @@ def college_activity(request):
     # Count users waiting
     waiting_count = MatchingService.get_waiting_count(college)
 
+    # Count total registered students from this college
+    from accounts.models import User
+    registered_students_count = User.objects.filter(college=college).count()
+
     return Response(
         {
             "college_id": college.id,
             "college": college.name,
             "active_chats": active_chats_count,
             "waiting_count": waiting_count,
+            "registered_students": registered_students_count,
         },
         status=status.HTTP_200_OK,
     )
