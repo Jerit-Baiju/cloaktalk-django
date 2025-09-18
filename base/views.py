@@ -510,6 +510,66 @@ def create_confession(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def like_confession(request, confession_id):
+    """Like or unlike a confession."""
+    user = request.user
+    
+    try:
+        confession = Confession.objects.get(id=confession_id, college=user.college)
+    except Confession.DoesNotExist:
+        return Response({"error": "Confession not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Remove from dislikes if present
+    if user in confession.dislikes.all():
+        confession.dislikes.remove(user)
+    
+    # Toggle like
+    if user in confession.likes.all():
+        confession.likes.remove(user)
+        liked = False
+    else:
+        confession.likes.add(user)
+        liked = True
+    
+    return Response({
+        "liked": liked,
+        "likes_count": confession.likes_count,
+        "dislikes_count": confession.dislikes_count
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def dislike_confession(request, confession_id):
+    """Dislike or remove dislike from a confession."""
+    user = request.user
+    
+    try:
+        confession = Confession.objects.get(id=confession_id, college=user.college)
+    except Confession.DoesNotExist:
+        return Response({"error": "Confession not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Remove from likes if present
+    if user in confession.likes.all():
+        confession.likes.remove(user)
+    
+    # Toggle dislike
+    if user in confession.dislikes.all():
+        confession.dislikes.remove(user)
+        disliked = False
+    else:
+        confession.dislikes.add(user)
+        disliked = True
+    
+    return Response({
+        "disliked": disliked,
+        "likes_count": confession.likes_count,
+        "dislikes_count": confession.dislikes_count
+    })
+
+
 class HomepageView(View):
     """Homepage view with feedback form"""
 

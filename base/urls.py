@@ -17,4 +17,6 @@ urlpatterns = [
     # Confession endpoints
     path("confessions/", views.confession_list, name="confession_list"),
     path("confessions/create/", views.create_confession, name="create_confession"),
+    path("confessions/<uuid:confession_id>/like/", views.like_confession, name="like_confession"),
+    path("confessions/<uuid:confession_id>/dislike/", views.dislike_confession, name="dislike_confession"),
 ]
