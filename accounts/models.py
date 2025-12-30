@@ -17,6 +17,7 @@ class User(AbstractUser):
     bio = models.TextField(max_length=500, blank=True, null=True)
     college = models.ForeignKey("base.College", on_delete=models.SET_NULL, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
+    is_service_account = models.BooleanField(default=False, help_text="Service accounts can chat with users from any organization")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

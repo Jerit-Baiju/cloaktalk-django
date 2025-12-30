@@ -95,7 +95,7 @@
                 <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium text-ctpink-400 hover:underline">
                   {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}
                 </a>
-                <span class="text-xs px-2 py-1 rounded bg-white/10 text-gray-300"> {{ chat.college.name }} </span>
+                <span class="text-xs px-2 py-1 rounded bg-white/10 text-gray-300"> {{ chat.college.name|default:"Cross-Org" }} </span>
               </div>
 
               <div class="flex items-center gap-4 text-sm text-gray-400">

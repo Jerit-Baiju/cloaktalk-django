@@ -11,7 +11,7 @@ from jwt import decode as jwt_decode
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken
 
-from base.models import Chat, Message
+from base.models import Chat, Message, WaitingListEntry
 from base.services import MatchingService
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
         # Predefine attributes to satisfy linters
         self.user = None
         self.college_group_name = ""
+        self.user_group_name = ""
 
     async def connect(self):
         """Handle WebSocket connection."""
@@ -37,13 +38,20 @@ class QueueConsumer(AsyncWebsocketConsumer):
             return
 
         # Check if user has college (using sync_to_async for foreign key access)
+        # Service accounts don't need a college
         user_college = await database_sync_to_async(lambda: self.user.college)()
-        if not user_college:
+        is_service_account = await database_sync_to_async(lambda: self.user.is_service_account)()
+
+        if not user_college and not is_service_account:
             await self.close(code=4002)  # No college assigned
             return
 
-        # Join college group for queue updates
-        self.college_group_name = f"queue_{user_college.id}"
+        # Join college group for queue updates (or global group for service accounts)
+        if user_college:
+            self.college_group_name = f"queue_{user_college.id}"
+        else:
+            self.college_group_name = "queue_service_accounts"
+
         await self.channel_layer.group_add(self.college_group_name, self.channel_name)
 
         # Also join user-specific group for direct messages
@@ -57,7 +65,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
 
         # Broadcast user presence update
         await self.channel_layer.group_send(
-            self.college_group_name, {"type": "user_presence_update", "user_id": str(self.user.id), "status": "online"}
+            self.college_group_name, {"type": "user_presence_update", "user_id": str(
+                self.user.id), "status": "online"}
         )
 
     async def get_user_from_token(self):
@@ -65,7 +74,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
         try:
             # Get token from query string
             query_string = self.scope.get("query_string", b"").decode()
-            query_params = dict(param.split("=") for param in query_string.split("&") if "=" in param)
+            query_params = dict(param.split("=")
+                                for param in query_string.split("&") if "=" in param)
             token = query_params.get("token")
 
             if not token:
@@ -78,7 +88,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 return None
 
             # Decode token to get user ID
-            decoded_token = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            decoded_token = jwt_decode(
+                token, settings.SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
 
             if not user_id:
@@ -99,7 +110,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
             # Broadcast user presence update
             await self.channel_layer.group_send(
                 self.college_group_name,
-                {"type": "user_presence_update", "user_id": str(self.user.id) if self.user else None, "status": "offline"},
+                {"type": "user_presence_update", "user_id": str(
+                    self.user.id) if self.user else None, "status": "offline"},
             )
 
         if hasattr(self, "user_group_name"):
@@ -126,12 +138,15 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def join_queue(self):
         """Add user to waiting queue."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
+        is_service_account = await database_sync_to_async(lambda: self.user.is_service_account)()
+
         # If user already has an active chat, return a non-queue status
         active_chat = await database_sync_to_async(MatchingService.get_active_chat)(self.user)
         if active_chat:
             await self.send(
                 text_data=json.dumps(
-                    {"type": "chat_matched", "chat_id": str(active_chat.id), "message": "Already in an active chat."}
+                    {"type": "chat_matched", "chat_id": str(
+                        active_chat.id), "message": "Already in an active chat."}
                 )
             )
             return
@@ -142,30 +157,44 @@ class QueueConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(self.college_group_name, {"type": "queue_update", "action": "user_joined"})
 
             # Get queue statistics for user feedback
-            queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+            # For service accounts, check all colleges for matches
+            if is_service_account:
+                queue_stats = {"total_waiting": 1,
+                               "message": "Looking for users to chat with..."}
+                college_name = "Service Account"
+            else:
+                queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+                college_name = user_college.name
 
             # Send enhanced queue status with matching info
             await self.send(
                 text_data=json.dumps(
                     {
                         "type": "queue_status",
-                        "waiting_count": queue_stats["total_waiting"],
-                        "college": user_college.name,
+                        "waiting_count": queue_stats.get("total_waiting", 1),
+                        "college": college_name,
                         "is_in_queue": True,
                         "queue_stats": queue_stats,
-                        "message": self._get_queue_message(queue_stats),
+                        "message": queue_stats.get("message") or self._get_queue_message(queue_stats),
                     }
                 )
             )
 
             # Try to find a match
             await self.try_match()
+
+            # Also trigger matching for the group (helps match users already waiting)
+            await self.channel_layer.group_send(
+                self.college_group_name,
+                {"type": "trigger_match"}
+            )
         else:
             # Already in queue; respond gracefully with current status
             count = await database_sync_to_async(MatchingService.get_waiting_count)(user_college)
             await self.send(
                 text_data=json.dumps(
-                    {"type": "queue_status", "waiting_count": count, "college": user_college.name, "is_in_queue": True}
+                    {"type": "queue_status", "waiting_count": count,
+                        "college": user_college.name, "is_in_queue": True}
                 )
             )
 
@@ -193,14 +222,24 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def try_match(self):
         """Try to match users and create chat if possible."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
-        chat = await database_sync_to_async(MatchingService.try_match_users)(user_college)
+        is_service_account = await database_sync_to_async(lambda: self.user.is_service_account)()
+
+        # Service accounts can match across organizations, so try all colleges
+        # Regular users try their own college with service accounts included
+        if is_service_account:
+            # Service account trying to match - check all colleges
+            chat = await database_sync_to_async(MatchingService.try_match_service_account)()
+        else:
+            # Regular user trying to match - check their college with service accounts
+            chat = await database_sync_to_async(MatchingService.try_match_users)(user_college, include_service_accounts=True)
 
         if chat:
             # Notify both participants about the match
             participants = await database_sync_to_async(chat.get_participants)()
             for participant in participants:
                 await self.channel_layer.group_send(
-                    f"user_{participant.id}", {"type": "chat_matched", "chat_id": str(chat.id)}
+                    f"user_{participant.id}", {
+                        "type": "chat_matched", "chat_id": str(chat.id)}
                 )
 
             # Update queue for college group
@@ -213,22 +252,26 @@ class QueueConsumer(AsyncWebsocketConsumer):
         """Schedule a delayed match attempt for users who might be ready after waiting 5 seconds."""
 
         async def delayed_match():
-            await asyncio.sleep(6)  # Wait 6 seconds to ensure 5+ second wait time has passed
+            # Wait 6 seconds to ensure 5+ second wait time has passed
+            await asyncio.sleep(6)
 
             # Try matching again - this time users who have waited 5+ seconds should be eligible
-            chat = await database_sync_to_async(MatchingService.try_match_users)(college)
+            # Include service accounts in matching
+            chat = await database_sync_to_async(MatchingService.try_match_users)(college, include_service_accounts=True)
 
             if chat:
                 # Notify both participants about the match
                 participants = await database_sync_to_async(chat.get_participants)()
                 for participant in participants:
                     await self.channel_layer.group_send(
-                        f"user_{participant.id}", {"type": "chat_matched", "chat_id": str(chat.id)}
+                        f"user_{participant.id}", {
+                            "type": "chat_matched", "chat_id": str(chat.id)}
                     )
 
                 # Update queue for college group
                 await self.channel_layer.group_send(
-                    f"college_{college.id}", {"type": "queue_update", "action": "match_created"}
+                    f"college_{college.id}", {
+                        "type": "queue_update", "action": "match_created"}
                 )
 
         # Create the delayed task
@@ -237,15 +280,27 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def send_queue_status(self):
         """Send current queue status to user."""
         user_college = await database_sync_to_async(lambda: self.user.college)()
+        is_service_account = await database_sync_to_async(lambda: self.user.is_service_account)()
 
         # Get enhanced queue statistics
-        queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+        if user_college:
+            queue_stats = await database_sync_to_async(MatchingService.get_queue_waiting_stats)(user_college)
+            college_name = user_college.name
+        else:
+            # Service account without college
+            queue_stats = {
+                "total_waiting": 0,
+                "fresh_users": 0,
+                "experienced_users": 0,
+                "ready_for_matching": True,
+                "users_waiting_over_5_seconds": 0,
+            }
+            college_name = "Cross-Organization"
 
         # Determine if current user is already queued
-        from base.models import WaitingListEntry
 
         is_in_queue = await database_sync_to_async(
-            WaitingListEntry.objects.filter(user=self.user, college=user_college).exists
+            WaitingListEntry.objects.filter(user=self.user).exists
         )()
 
         await self.send(
@@ -253,9 +308,10 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "queue_status",
                     "waiting_count": queue_stats["total_waiting"],
-                    "college": user_college.name,
+                    "college": college_name,
                     "is_in_queue": is_in_queue,
                     "queue_stats": queue_stats,
+                    "is_service_account": is_service_account,
                     "message": self._get_queue_message(queue_stats) if is_in_queue else "Join the queue to start chatting!",
                 }
             )
@@ -269,7 +325,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
         """Handle chat match notification."""
         await self.send(
             text_data=json.dumps(
-                {"type": "chat_matched", "chat_id": event["chat_id"], "message": "Match found! Redirecting to chat..."}
+                {"type": "chat_matched",
+                    "chat_id": event["chat_id"], "message": "Match found! Redirecting to chat..."}
             )
         )
 
@@ -279,7 +336,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
         if event.get("user_id") != str(self.user.id):
             await self.send(
                 text_data=json.dumps(
-                    {"type": "user_presence_update", "user_id": event["user_id"], "status": event["status"]}
+                    {"type": "user_presence_update",
+                        "user_id": event["user_id"], "status": event["status"]}
                 )
             )
 
@@ -329,7 +387,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             # Get token from query string
             query_string = self.scope.get("query_string", b"").decode()
-            query_params = dict(param.split("=") for param in query_string.split("&") if "=" in param)
+            query_params = dict(param.split("=")
+                                for param in query_string.split("&") if "=" in param)
             token = query_params.get("token")
 
             if not token:
@@ -342,7 +401,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 return None
 
             # Decode token to get user ID
-            decoded_token = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            decoded_token = jwt_decode(
+                token, settings.SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
 
             if not user_id:
@@ -408,7 +468,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if success:
             # Notify all participants that chat has ended
             await self.channel_layer.group_send(
-                self.room_group_name, {"type": "chat_ended", "message": "Chat has been ended"}
+                self.room_group_name, {
+                    "type": "chat_ended", "message": "Chat has been ended"}
             )
 
     async def broadcast_typing(self, is_typing):
@@ -443,6 +504,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Only send to other users, not the one who started typing
         if event["user_id"] != str(self.user.id):
             await self.send(text_data=json.dumps({"type": "typing_start", "user_id": event["user_id"]}))
+
+    async def trigger_match(self, _event):
+        """Handle trigger to attempt matching for users in the group."""
+        # This is called when someone joins the queue to trigger matching for all waiting users
+        user_college = await database_sync_to_async(lambda: self.user.college)()
+        is_service_account = await database_sync_to_async(lambda: self.user.is_service_account)()
+
+        # Check if this user is in the waiting list
+        is_waiting = await database_sync_to_async(
+            lambda: WaitingListEntry.objects.filter(user=self.user).exists()
+        )()
+
+        if is_waiting:
+            # Try to match
+            if is_service_account:
+                chat = await database_sync_to_async(MatchingService.try_match_service_account)()
+            else:
+                chat = await database_sync_to_async(MatchingService.try_match_users)(user_college, include_service_accounts=True)
+
+            if chat:
+                # Notify both participants about the match
+                participants = await database_sync_to_async(chat.get_participants)()
+                for participant in participants:
+                    await self.channel_layer.group_send(
+                        f"user_{participant.id}", {
+                            "type": "chat_matched", "chat_id": str(chat.id)}
+                    )
 
     async def typing_stop(self, event):
         """Handle typing stop events."""

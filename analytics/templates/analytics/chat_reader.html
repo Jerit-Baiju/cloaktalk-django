@@ -2,7 +2,7 @@
 <div class="flex items-center justify-between mb-4">
   <div>
     <h1 class="text-xl font-semibold">Reader</h1>
-    <div class="text-sm text-gray-400">{{ chat.college.name }} · {{ chat.created_at }}</div>
+    <div class="text-sm text-gray-400">{{ chat.college.name|default:"Cross-Organization Chat" }} · {{ chat.created_at }}</div>
   </div>
   <div class="flex items-center gap-2">
     {% if prev_chat %}

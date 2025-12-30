@@ -94,7 +94,7 @@
           <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium hover:underline"
             >{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a
           >
-          <div class="text-xs text-gray-400">{{ chat.college.name }}</div>
+          <div class="text-xs text-gray-400">{{ chat.college.name|default:"Cross-Org" }}</div>
         </div>
         <div class="text-ctpink-400 font-semibold">{{ chat.msgs }}</div>
       </li>

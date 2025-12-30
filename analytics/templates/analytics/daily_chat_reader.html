@@ -115,7 +115,7 @@
           {{ current_chat.participant1.display_name }} ↔ {{ current_chat.participant2.display_name }}
         </h2>
         <div class="text-sm text-gray-400 mt-1">
-          {{ current_chat.college.name }} • Started at {{ current_chat.created_at|date:"H:i" }}
+          {{ current_chat.college.name|default:"Cross-Organization" }} • Started at {{ current_chat.created_at|date:"H:i" }}
         </div>
       </div>
 

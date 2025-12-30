@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Tuple
 
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -13,12 +13,21 @@ class MatchingService:
     """Service to handle matching users from the same college into chats."""
 
     @classmethod
-    def add_to_waiting_list(cls, user: User, college: College) -> bool:
+    def add_to_waiting_list(cls, user: User, college: College = None) -> bool:
         """
         Add user to waiting list for their college.
+        Service accounts can be added without a college.
         Returns True if added successfully, False if already in queue.
         """
-        _, created = WaitingListEntry.objects.get_or_create(user=user, college=college)
+        # Service accounts don't need a college
+        if user.is_service_account:
+            college = college or user.college  # Use None if no college
+
+        if not college and not user.is_service_account:
+            raise ValueError("Regular users must have a college")
+
+        _, created = WaitingListEntry.objects.get_or_create(
+            user=user, college=college)
         return created
 
     @classmethod
@@ -28,9 +37,11 @@ class MatchingService:
         If college is not specified, removes from all waiting lists.
         """
         if college:
-            deleted_count, _ = WaitingListEntry.objects.filter(user=user, college=college).delete()
+            deleted_count, _ = WaitingListEntry.objects.filter(
+                user=user, college=college).delete()
         else:
-            deleted_count, _ = WaitingListEntry.objects.filter(user=user).delete()
+            deleted_count, _ = WaitingListEntry.objects.filter(
+                user=user).delete()
 
         return deleted_count > 0
 
@@ -40,9 +51,10 @@ class MatchingService:
         return WaitingListEntry.objects.filter(college=college).count()
 
     @classmethod
-    def find_match(cls, college: College) -> Optional[Tuple[User, User]]:
+    def find_match(cls, college: College = None, include_service_accounts: bool = False) -> Optional[Tuple[User, User]]:
         """
         Find two users from the same college to match using smart algorithm.
+        If include_service_accounts is True, also considers service accounts from any college.
         Priority:
         1. Fresh users (who haven't chatted with anyone in queue)
         2. Users who haven't chatted with each other
@@ -50,7 +62,21 @@ class MatchingService:
 
         Returns tuple of (user1, user2) if match found, None otherwise.
         """
-        waiting_entries = WaitingListEntry.objects.filter(college=college).select_related("user").order_by("created_at")
+        # Build query for waiting entries
+        if college:
+            # Get users from specific college, optionally including service accounts
+            if include_service_accounts:
+                waiting_entries = WaitingListEntry.objects.filter(
+                    Q(college=college) | Q(user__is_service_account=True)
+                ).select_related("user").order_by("created_at")
+            else:
+                waiting_entries = WaitingListEntry.objects.filter(
+                    college=college).select_related("user").order_by("created_at")
+        else:
+            # No college specified, get all service accounts
+            waiting_entries = WaitingListEntry.objects.filter(
+                user__is_service_account=True
+            ).select_related("user").order_by("created_at")
 
         if len(waiting_entries) < 2:
             return None
@@ -79,7 +105,7 @@ class MatchingService:
 
         # Strategy 2: All users have some chat history, find pairs who haven't chatted together
         for i, user1 in enumerate(experienced_users):
-            for user2 in experienced_users[i + 1 :]:
+            for user2 in experienced_users[i + 1:]:
                 if not cls.have_users_chatted_before(user1, user2):
                     return (user1, user2)
 
@@ -92,21 +118,24 @@ class MatchingService:
         oldest_chat_time = None
 
         for i, user1 in enumerate(experienced_users):
-            user1_entry = next(entry for entry in waiting_entries if entry.user == user1)
+            user1_entry = next(
+                entry for entry in waiting_entries if entry.user == user1)
 
             # Check if user1 has been waiting for at least 5 seconds
             if (now - user1_entry.created_at).total_seconds() < 5:
                 continue
 
-            for user2 in experienced_users[i + 1 :]:
-                user2_entry = next(entry for entry in waiting_entries if entry.user == user2)
+            for user2 in experienced_users[i + 1:]:
+                user2_entry = next(
+                    entry for entry in waiting_entries if entry.user == user2)
 
                 # Check if user2 has been waiting for at least 5 seconds
                 if (now - user2_entry.created_at).total_seconds() < 5:
                     continue
 
                 # Find their most recent chat together
-                most_recent_chat_time = cls.get_most_recent_chat_time(user1, user2)
+                most_recent_chat_time = cls.get_most_recent_chat_time(
+                    user1, user2)
 
                 if oldest_chat_time is None or (most_recent_chat_time and most_recent_chat_time < oldest_chat_time):
                     oldest_chat_time = most_recent_chat_time
@@ -123,7 +152,8 @@ class MatchingService:
     def have_users_chatted_before(cls, user1: User, user2: User) -> bool:
         """Check if two users have had any chat together before."""
         return Chat.objects.filter(
-            (Q(participant1=user1) & Q(participant2=user2)) | (Q(participant1=user2) & Q(participant2=user1))
+            (Q(participant1=user1) & Q(participant2=user2)) | (
+                Q(participant1=user2) & Q(participant2=user1))
         ).exists()
 
     @classmethod
@@ -131,7 +161,8 @@ class MatchingService:
         """Get the creation time of the most recent chat between two users."""
         most_recent_chat = (
             Chat.objects.filter(
-                (Q(participant1=user1) & Q(participant2=user2)) | (Q(participant1=user2) & Q(participant2=user1))
+                (Q(participant1=user1) & Q(participant2=user2)) | (
+                    Q(participant1=user2) & Q(participant2=user1))
             )
             .order_by("-created_at")
             .first()
@@ -142,7 +173,8 @@ class MatchingService:
     @classmethod
     def get_queue_waiting_stats(cls, college: College) -> dict:
         """Get statistics about users waiting in queue."""
-        waiting_entries = WaitingListEntry.objects.filter(college=college).select_related("user").order_by("created_at")
+        waiting_entries = WaitingListEntry.objects.filter(
+            college=college).select_related("user").order_by("created_at")
 
         if not waiting_entries:
             return {
@@ -154,12 +186,14 @@ class MatchingService:
             }
 
         users = [entry.user for entry in waiting_entries]
-        fresh_users = sum(1 for user in users if not cls.has_any_chat_history(user))
+        fresh_users = sum(
+            1 for user in users if not cls.has_any_chat_history(user))
         experienced_users = len(users) - fresh_users
 
         # Count users who have been waiting over 5 seconds
         now = timezone.now()
-        users_waiting_over_5_seconds = sum(1 for entry in waiting_entries if (now - entry.created_at).total_seconds() >= 5)
+        users_waiting_over_5_seconds = sum(1 for entry in waiting_entries if (
+            now - entry.created_at).total_seconds() >= 5)
 
         # Check if matching is possible
         ready_for_matching = False
@@ -171,7 +205,7 @@ class MatchingService:
             else:
                 # Check if any pair hasn't chatted before
                 for i, user1 in enumerate(users):
-                    for user2 in users[i + 1 :]:
+                    for user2 in users[i + 1:]:
                         if not cls.have_users_chatted_before(user1, user2):
                             ready_for_matching = True
                             break
@@ -188,15 +222,26 @@ class MatchingService:
 
     @classmethod
     @transaction.atomic
-    def create_chat(cls, user1: User, user2: User, college: College) -> Chat:
+    def create_chat(cls, user1: User, user2: User, college: College = None) -> Chat:
         """
         Create a new chat between two users and remove them from waiting list.
+        College is optional for service account chats.
         """
+        # Determine college for the chat
+        # Service accounts can chat across colleges, so college may be None
+        if not college:
+            # Try to use college from regular users
+            if not user1.is_service_account and user1.college:
+                college = user1.college
+            elif not user2.is_service_account and user2.college:
+                college = user2.college
+
         # Remove both users from waiting list
-        WaitingListEntry.objects.filter(user__in=[user1, user2], college=college).delete()
+        WaitingListEntry.objects.filter(user__in=[user1, user2]).delete()
 
         # Create the chat
-        chat = Chat.objects.create(college=college, participant1=user1, participant2=user2)
+        chat = Chat.objects.create(
+            college=college, participant1=user1, participant2=user2)
 
         # Create initial system message
         Message.objects.create(
@@ -206,15 +251,43 @@ class MatchingService:
         return chat
 
     @classmethod
-    def try_match_users(cls, college: College) -> Optional[Chat]:
+    def try_match_service_account(cls) -> Optional[Chat]:
+        """
+        Try to match a service account with any waiting user from any college.
+        Returns Chat object if successful match, None otherwise.
+        """
+        # Get all service accounts in queue
+        service_entries = WaitingListEntry.objects.filter(
+            user__is_service_account=True
+        ).select_related("user")
+
+        if not service_entries.exists():
+            return None
+
+        # Get all colleges with waiting users
+        colleges_with_users = College.objects.filter(
+            waitinglistentry__isnull=False
+        ).distinct()
+
+        # Try to match service account with any waiting user from any college
+        for college in colleges_with_users:
+            chat = cls.try_match_users(college, include_service_accounts=True)
+            if chat:
+                return chat
+
+        return None
+
+    @classmethod
+    def try_match_users(cls, college: College = None, include_service_accounts: bool = False) -> Optional[Chat]:
         """
         Try to match users in the waiting list for a college.
+        If include_service_accounts is True, also considers service accounts.
         Returns Chat object if successful match, None otherwise.
         """
         # Keep attempting to find a valid pair (defensive against stale entries)
 
         while True:
-            match = cls.find_match(college)
+            match = cls.find_match(college, include_service_accounts)
             if not match:
                 return None
 
@@ -225,17 +298,27 @@ class MatchingService:
             # If either already has an active chat, remove their waiting entry and try again
             removed_any = False
             if user1_active:
-                WaitingListEntry.objects.filter(user=user1, college=college).delete()
+                WaitingListEntry.objects.filter(user=user1).delete()
                 removed_any = True
             if user2_active:
-                WaitingListEntry.objects.filter(user=user2, college=college).delete()
+                WaitingListEntry.objects.filter(user=user2).delete()
                 removed_any = True
 
             if removed_any:
                 continue
 
             # Neither user has an active chat -> create a new chat
-            return cls.create_chat(user1, user2, college)
+            # Determine college for the chat
+            chat_college = college
+            if user1.is_service_account or user2.is_service_account:
+                # For service account chats, use college of the non-service user
+                if not user1.is_service_account:
+                    chat_college = user1.college
+                elif not user2.is_service_account:
+                    chat_college = user2.college
+                # else both are service accounts, college can be None
+
+            return cls.create_chat(user1, user2, chat_college)
 
     @classmethod
     def get_active_chat(cls, user: User) -> Optional[Chat]:
@@ -258,4 +341,3 @@ class MatchingService:
 
 
 # Import models after class definition to avoid circular imports
-from django.db import models

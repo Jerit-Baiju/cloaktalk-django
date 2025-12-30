@@ -114,12 +114,14 @@ class GoogleLogin(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        token_data = get_auth_tokens(code, f"{os.environ['CLIENT_HOST']}/api/auth/callback/google")
+        token_data = get_auth_tokens(
+            code, f"{os.environ['CLIENT_HOST']}/api/auth/callback/google")
 
         # Check if id_token exists in the response
         if "id_token" not in token_data:
             # Log the full error response for debugging
-            error_description = token_data.get("error_description", "Unknown error")
+            error_description = token_data.get(
+                "error_description", "Unknown error")
             error_type = token_data.get("error", "invalid_grant")
 
             print(f"Google OAuth Error: {error_type} - {error_description}")
@@ -134,60 +136,23 @@ class GoogleLogin(APIView):
             )
 
         try:
-            data = jwt.decode(token_data["id_token"], options={"verify_signature": False})
+            data = jwt.decode(token_data["id_token"], options={
+                              "verify_signature": False})
             email = data["email"]
             given_name = data.get("given_name", "")
             family_name = data.get("family_name", "")
             picture_url = data.get("picture", "")
             google_access_token = token_data["access_token"]
-            google_refresh_token = token_data.get("refresh_token", "")  # Handle case when refresh token is not provided
+            # Handle case when refresh token is not provided
+            google_refresh_token = token_data.get("refresh_token", "")
 
-            # For personal Gmail addresses, create the user but mark them inactive,
-            # persist Google tokens and avatar (if available), then return the same error
-            # response the frontend expects.
+            # Check if user already exists and is a service account
             domain = get_domain_from_email(email)
-            if domain.lower() in {"gmail.com", "googlemail.com"}:
-                # Lookup college without forcing creation (to avoid missing required fields)
-                college = College.objects.filter(domain=domain).first()
+            existing_user = User.objects.filter(email=email).first()
+            is_service_account = existing_user and existing_user.is_service_account
 
-                # If no college exists for gmail domain, create one with is_active=False
-                if not college:
-                    college = College.objects.create(
-                        name="Gmail Users",
-                        domain=domain,
-                        window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
-                        window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
-                        is_active=False,  # Gmail colleges start inactive
-                    )
-
-                # Find or create the user explicitly to avoid IntegrityErrors
-                user = User.objects.filter(email=email).first()
-                if not user:
-                    username = self._generate_unique_username(email)
-                    user = User.objects.create(
-                        email=email,
-                        username=username,
-                        first_name=given_name,
-                        last_name=family_name,
-                        is_active=False,  # personal gmail users inactive by default
-                        college=college,
-                    )
-
-                    # Attempt to download the user's avatar if available
-                    if picture_url:
-                        try:
-                            response = requests.get(picture_url, timeout=10)
-                            if response.status_code == 200:
-                                user.avatar.save(f"{email}.png", ContentFile(response.content), save=True)
-                        except requests.exceptions.RequestException as e:
-                            print(f"Error downloading avatar: {e}")
-
-                # Update GoogleToken with access and refresh tokens even for inactive users
-                google_token, _ = GoogleToken.objects.get_or_create(user=user)
-                google_token.access_token = google_access_token
-                google_token.refresh_token = google_refresh_token
-                google_token.save()
-
+            # Reject Gmail users unless they're service accounts
+            if domain.lower() in {"gmail.com", "googlemail.com"} and not is_service_account:
                 return Response(
                     {
                         "error": "only_organization_email_allowed",
@@ -196,51 +161,114 @@ class GoogleLogin(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Organization or non-gmail domain: ensure active user creation
-            college = College.objects.filter(domain=domain).first()
+            # Handle service accounts (no college assignment)
+            if is_service_account:
+                user = existing_user
 
-            # If no college exists for this domain, create one with is_active=False
-            if not college:
-                # Extract a readable college name from domain
-                college_name = domain.replace(".", " ").title()
-                if college_name.endswith(" Edu"):
-                    college_name = college_name[:-4] + " University"
-                elif college_name.endswith(" Ac In"):
-                    college_name = college_name[:-6] + " College"
+                # Update user details
+                user.first_name = given_name
+                user.last_name = family_name
+                user.is_active = True
+                # Ensure service accounts have no college
+                user.college = None
+                user.save()
 
-                college = College.objects.create(
-                    name=college_name,
-                    domain=domain,
-                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
-                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
-                    is_active=False,  # New colleges start inactive
-                )
-
-            user = User.objects.filter(email=email).first()
-            if not user:
-                username = self._generate_unique_username(email)
-                user = User.objects.create(
-                    email=email,
-                    username=username,
-                    first_name=given_name,
-                    last_name=family_name,
-                    college=college,
-                )
-
-                # Attempt to download the user's avatar if available
-                if picture_url:
+                # Download avatar if available and not already set
+                if picture_url and not user.avatar:
                     try:
                         response = requests.get(picture_url, timeout=10)
                         if response.status_code == 200:
-                            user.avatar.save(f"{email}.png", ContentFile(response.content), save=True)
+                            user.avatar.save(f"{email}.png", ContentFile(
+                                response.content), save=True)
                     except requests.exceptions.RequestException as e:
                         print(f"Error downloading avatar: {e}")
 
-            # Update GoogleToken with access and refresh tokens
-            google_token, _ = GoogleToken.objects.get_or_create(user=user)
-            google_token.access_token = google_access_token
-            google_token.refresh_token = google_refresh_token
-            google_token.save()
+                # Update GoogleToken
+                google_token, _ = GoogleToken.objects.get_or_create(user=user)
+                google_token.access_token = google_access_token
+                google_token.refresh_token = google_refresh_token
+                google_token.save()
+
+                # Create JWT tokens for service account and return
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+
+                user_data = {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name or "",
+                    "last_name": user.last_name or "",
+                    "profile_picture": user.avatar.url if user.avatar else None,
+                    "is_active": user.is_active,
+                    "is_service_account": user.is_service_account,
+                    "date_joined": user.date_joined.isoformat(),
+                    "college": None,
+                }
+
+                return Response(
+                    {
+                        "access": access_token,
+                        "refresh": refresh_token,
+                        "user": user_data,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            # Organization or non-gmail domain: ensure active user creation
+            else:
+                college = College.objects.filter(domain=domain).first()
+
+                # If no college exists for this domain, create one with is_active=False
+                if not college:
+                    # Extract a readable college name from domain
+                    college_name = domain.replace(".", " ").title()
+                    if college_name.endswith(" Edu"):
+                        college_name = college_name[:-4] + " University"
+                    elif college_name.endswith(" Ac In"):
+                        college_name = college_name[:-6] + " College"
+
+                    college = College.objects.create(
+                        name=college_name,
+                        domain=domain,
+                        window_start=datetime.strptime(
+                            "20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                        window_end=datetime.strptime(
+                            "21:00:00", "%H:%M:%S").time(),  # Default 9 PM
+                        is_active=False,  # New colleges start inactive
+                    )
+
+                user = User.objects.filter(email=email).first()
+                if not user:
+                    username = self._generate_unique_username(email)
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        first_name=given_name,
+                        last_name=family_name,
+                        college=college,
+                    )
+
+                    # Attempt to download the user's avatar if available
+                    if picture_url:
+                        try:
+                            response = requests.get(picture_url, timeout=10)
+                            if response.status_code == 200:
+                                user.avatar.save(f"{email}.png", ContentFile(
+                                    response.content), save=True)
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error downloading avatar: {e}")
+
+                # Update GoogleToken with access and refresh tokens
+                google_token, _ = GoogleToken.objects.get_or_create(user=user)
+                google_token.access_token = google_access_token
+                google_token.refresh_token = google_refresh_token
+                google_token.save()
+
+                # Ensure organization users are active on login
+                if not user.is_active:
+                    user.is_active = True
+                    user.save()
 
             # Create JWT tokens for the user
             refresh = RefreshToken.for_user(user)
@@ -255,6 +283,7 @@ class GoogleLogin(APIView):
                 "last_name": user.last_name or "",
                 "profile_picture": user.avatar.url if user.avatar else None,
                 "is_active": user.is_active,
+                "is_service_account": user.is_service_account,
                 "date_joined": user.date_joined.isoformat(),
                 "college": (
                     {
@@ -295,31 +324,35 @@ class UserView(APIView):
         user = request.user
 
         # Ensure user has a college - fix for legacy users who might not have one
-        if not user.college:
+        # Service accounts don't need a college
+        if not user.college and not user.is_service_account:
             domain = get_domain_from_email(user.email)
-            college = College.objects.filter(domain=domain).first()
 
-            if not college:
-                # Extract a readable college name from domain
-                college_name = domain.replace(".", " ").title()
-                if college_name.endswith(" Edu"):
-                    college_name = college_name[:-4] + " University"
-                elif college_name.endswith(" Ac In"):
-                    college_name = college_name[:-6] + " College"
-                elif domain.lower() in {"gmail.com", "googlemail.com"}:
-                    college_name = "Gmail Users"
+            # Don't create colleges for Gmail users - they shouldn't be here
+            if domain.lower() not in {"gmail.com", "googlemail.com"}:
+                college = College.objects.filter(domain=domain).first()
 
-                college = College.objects.create(
-                    name=college_name,
-                    domain=domain,
-                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
-                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
-                    is_active=False,  # New colleges start inactive
-                )
+                if not college:
+                    # Extract a readable college name from domain
+                    college_name = domain.replace(".", " ").title()
+                    if college_name.endswith(" Edu"):
+                        college_name = college_name[:-4] + " University"
+                    elif college_name.endswith(" Ac In"):
+                        college_name = college_name[:-6] + " College"
 
-            # Assign college to user
-            user.college = college
-            user.save()
+                    college = College.objects.create(
+                        name=college_name,
+                        domain=domain,
+                        window_start=datetime.strptime(
+                            "20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                        window_end=datetime.strptime(
+                            "21:00:00", "%H:%M:%S").time(),  # Default 9 PM
+                        is_active=False,  # New colleges start inactive
+                    )
+
+                # Assign college to user
+                user.college = college
+                user.save()
 
         # Format user data to match frontend expectations
         user_data = {
@@ -329,6 +362,7 @@ class UserView(APIView):
             "last_name": user.last_name or "",
             "profile_picture": user.avatar.url if user.avatar else None,
             "is_active": user.is_active,
+            "is_service_account": user.is_service_account,
             "date_joined": user.date_joined.isoformat(),
             "college": (
                 {

@@ -6,11 +6,15 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views import View
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from base.models import College, Feedback
+from accounts.models import User
+from accounts.utils import get_domain_from_email
+from base.models import Chat, College, Feedback, Message, WaitingListEntry
+from base.services import MatchingService
 
 
 def _format_time_field(t: Any) -> str:
@@ -35,41 +39,66 @@ class CollegeAccessView(APIView):
         user = request.user
 
         # Debug logging
-        print(f"CollegeAccessView: User authenticated: {user.is_authenticated}")
+        print(
+            f"CollegeAccessView: User authenticated: {user.is_authenticated}")
         print(f"CollegeAccessView: User: {user}")
         print(f"CollegeAccessView: User type: {type(user)}")
-        print(f"CollegeAccessView: Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'MISSING')}")
-        print(f"CollegeAccessView: Content-Type: {request.META.get('CONTENT_TYPE', 'MISSING')}")
-        print(f"CollegeAccessView: HTTP_HOST: {request.META.get('HTTP_HOST', 'MISSING')}")
+        print(
+            f"CollegeAccessView: Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'MISSING')}")
+        print(
+            f"CollegeAccessView: Content-Type: {request.META.get('CONTENT_TYPE', 'MISSING')}")
+        print(
+            f"CollegeAccessView: HTTP_HOST: {request.META.get('HTTP_HOST', 'MISSING')}")
         if hasattr(user, "college"):
             print(f"CollegeAccessView: User college: {user.college}")
+
+        # Service accounts bypass all college restrictions
+        if user.is_service_account:
+            return Response(
+                {
+                    "can_access": True,
+                    "message": "Service account - full access granted",
+                    "is_service_account": True,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # Check if user has a college
         if not user.college:
             # Auto-assign college based on email domain
-            from accounts.utils import get_domain_from_email
 
             domain = get_domain_from_email(user.email)
 
             # Try to find existing college for this domain
             college = College.objects.filter(domain=domain).first()
 
-            # If no college exists, create one
+            # If no college exists, create one (but not for Gmail users)
             if not college:
+                # Don't create colleges for Gmail domains
+                if domain.lower() in {"gmail.com", "googlemail.com"}:
+                    return Response(
+                        {
+                            "can_access": False,
+                            "reason": "no_college",
+                            "message": "No college assigned. Please contact support.",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
                 # Extract a readable college name from domain
                 college_name = domain.replace(".", " ").title()
                 if college_name.endswith(" Edu"):
                     college_name = college_name[:-4] + " University"
                 elif college_name.endswith(" Ac In"):
                     college_name = college_name[:-6] + " College"
-                elif domain.lower() in {"gmail.com", "googlemail.com"}:
-                    college_name = "Gmail Users"
 
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
-                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
+                    window_start=datetime.strptime(
+                        "20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                    window_end=datetime.strptime(
+                        "21:00:00", "%H:%M:%S").time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
@@ -82,9 +111,11 @@ class CollegeAccessView(APIView):
         # Debug college settings
         print(f"CollegeAccessView: College name: {college.name}")
         print(f"CollegeAccessView: College is_active: {college.is_active}")
-        print(f"CollegeAccessView: College window_start: {college.window_start}")
+        print(
+            f"CollegeAccessView: College window_start: {college.window_start}")
         print(f"CollegeAccessView: College window_end: {college.window_end}")
-        print(f"CollegeAccessView: Current time: {timezone.localtime().time()}")
+        print(
+            f"CollegeAccessView: Current time: {timezone.localtime().time()}")
 
         # Check if college is active
         if not college.is_active:
@@ -163,32 +194,51 @@ class CollegeStatusView(APIView):
     def get(self, request):
         user = request.user
 
+        # Service accounts don't have college restrictions
+        if user.is_service_account:
+            return Response(
+                {
+                    "has_college": False,
+                    "is_service_account": True,
+                    "message": "Service account - no college restrictions",
+                },
+                status=status.HTTP_200_OK,
+            )
+
         if not user.college:
             # Auto-assign college based on email domain
-            from accounts.utils import get_domain_from_email
 
             domain = get_domain_from_email(user.email)
 
             # Try to find existing college for this domain
             college = College.objects.filter(domain=domain).first()
 
-            # If no college exists, create one
+            # If no college exists, create one (but not for Gmail users)
             if not college:
+                # Don't create colleges for Gmail domains
+                if domain.lower() in {"gmail.com", "googlemail.com"}:
+                    return Response(
+                        {
+                            "has_college": False,
+                            "error": "No college assigned. Please contact support.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 # Extract a readable college name from domain
                 college_name = domain.replace(".", " ").title()
                 if college_name.endswith(" Edu"):
                     college_name = college_name[:-4] + " University"
-
                 elif college_name.endswith(" Ac In"):
                     college_name = college_name[:-6] + " College"
-                elif domain.lower() in {"gmail.com", "googlemail.com"}:
-                    college_name = "Gmail Users"
 
                 college = College.objects.create(
                     name=college_name,
                     domain=domain,
-                    window_start=datetime.strptime("20:00:00", "%H:%M:%S").time(),  # Default 8 PM
-                    window_end=datetime.strptime("21:00:00", "%H:%M:%S").time(),  # Default 9 PM
+                    window_start=datetime.strptime(
+                        "20:00:00", "%H:%M:%S").time(),  # Default 8 PM
+                    window_end=datetime.strptime(
+                        "21:00:00", "%H:%M:%S").time(),  # Default 9 PM
                     is_active=False,  # New colleges start inactive
                 )
 
@@ -224,25 +274,32 @@ class CollegeStatusView(APIView):
         )
 
 
-# WebSocket and Chat Views
-
-from rest_framework.decorators import api_view, permission_classes
-
-from base.models import Chat, Message, WaitingListEntry
-from base.services import MatchingService
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def queue_status(request):
     """Get current queue status for user's college."""
     user = request.user
 
+    # Service accounts see all queues
+    if user.is_service_account:
+        waiting_count = WaitingListEntry.objects.count()
+        is_in_queue = WaitingListEntry.objects.filter(user=user).exists()
+
+        return Response(
+            {
+                "waiting_count": waiting_count,
+                "college": "All Colleges (Service Account)",
+                "college_id": None,
+                "is_in_queue": is_in_queue,
+            }
+        )
+
     if not user.college:
         return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
 
     waiting_count = MatchingService.get_waiting_count(user.college)
-    is_in_queue = WaitingListEntry.objects.filter(user=user, college=user.college).exists()
+    is_in_queue = WaitingListEntry.objects.filter(
+        user=user, college=user.college).exists()
 
     return Response(
         {
@@ -260,19 +317,37 @@ def college_activity(request):
     """Return activity stats for the current user's college: active chats and waiting users."""
     user = request.user
 
+    # Service accounts see global stats
+    if user.is_service_account:
+        active_chats_count = Chat.objects.filter(is_active=True).count()
+        waiting_count = WaitingListEntry.objects.count()
+        registered_students_count = User.objects.filter(
+            is_service_account=False).count()
+
+        return Response(
+            {
+                "college_id": None,
+                "college": "All Colleges (Service Account)",
+                "active_chats": active_chats_count,
+                "waiting_count": waiting_count,
+                "registered_students": registered_students_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     if not user.college:
         return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
 
     college = user.college
 
     # Count active chats for this college
-    active_chats_count = Chat.objects.filter(college=college, is_active=True).count()
+    active_chats_count = Chat.objects.filter(
+        college=college, is_active=True).count()
 
     # Count users waiting
     waiting_count = MatchingService.get_waiting_count(college)
 
     # Count total registered students from this college
-    from accounts.models import User
     registered_students_count = User.objects.filter(college=college).count()
 
     return Response(
@@ -293,7 +368,8 @@ def join_queue(request):
     """Add user to waiting queue."""
     user = request.user
 
-    if not user.college:
+    # Service accounts can join without a college
+    if not user.college and not user.is_service_account:
         return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Check if user already has an active chat
@@ -307,7 +383,12 @@ def join_queue(request):
 
     if added:
         # Try to find an immediate match
-        chat = MatchingService.try_match_users(user.college)
+        # Service accounts use different matching logic
+        if user.is_service_account:
+            chat = MatchingService.try_match_service_account()
+        else:
+            chat = MatchingService.try_match_users(
+                user.college, include_service_accounts=True)
 
         if chat:
             return Response(
@@ -344,7 +425,8 @@ def leave_queue(request):
     """Remove user from waiting queue."""
     user = request.user
 
-    if not user.college:
+    # Service accounts can leave without a college
+    if not user.college and not user.is_service_account:
         return Response({"error": "No college assigned to user"}, status=status.HTTP_400_BAD_REQUEST)
 
     removed = MatchingService.remove_from_waiting_list(user, user.college)
@@ -368,10 +450,11 @@ def get_chat(request, chat_id):
             return Response({"error": "Not authorized to access this chat"}, status=status.HTTP_403_FORBIDDEN)
 
         # Get recent messages
-        messages = Message.objects.filter(chat=chat).order_by("-created_at")[:50]
+        recent_messages = Message.objects.filter(
+            chat=chat).order_by("-created_at")[:50]
 
         message_data = []
-        for message in reversed(messages):
+        for message in reversed(recent_messages):
             message_data.append(
                 {
                     "id": str(message.id),
@@ -453,6 +536,7 @@ class HomepageView(View):
             Feedback.objects.create(comments=comments)
             messages.success(request, "Thank you for your feedback!")
         else:
-            messages.error(request, "Please provide some feedback before submitting.")
+            messages.error(
+                request, "Please provide some feedback before submitting.")
 
         return redirect("homepage")
