@@ -186,6 +186,33 @@ GOOGLE_CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
 # Channels Configuration
 ASGI_APPLICATION = "main.asgi.application"
 
-# Channel layer configuration (using in-memory for development)
-# For production, consider using Redis: https://channels.readthedocs.io/en/stable/topics/channel_layers.html
-CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+# Redis Configuration
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
+REDIS_DB = os.environ.get("REDIS_DB", "0")
+
+# Channel layer configuration using Redis for production
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, int(REDIS_PORT))],
+            "capacity": 1500,
+            "expiry": 10,
+        },
+    },
+}
+
+# Cache Configuration using Redis
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "KEY_PREFIX": "cloaktalk",
+        "TIMEOUT": 300,  # 5 minutes default timeout
+    }
+}
+
+# Session Configuration using Redis
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
