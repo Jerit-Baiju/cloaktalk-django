@@ -13,6 +13,22 @@ class MatchingService:
     """Service to handle matching users from the same college into chats."""
 
     @classmethod
+    def is_college_window_open(cls, college: College) -> bool:
+        """Check if a college's time window is currently open."""
+        if not college or not college.is_active:
+            return False
+
+        current_time = timezone.localtime().time()
+
+        # Handle time window that might cross midnight
+        if college.window_start <= college.window_end:
+            # Same day window (e.g., 20:00 to 21:00)
+            return college.window_start <= current_time <= college.window_end
+        else:
+            # Cross-midnight window (e.g., 23:00 to 01:00)
+            return current_time >= college.window_start or current_time <= college.window_end
+
+    @classmethod
     def add_to_waiting_list(cls, user: User, college: College = None) -> bool:
         """
         Add user to waiting list for their college.
@@ -81,7 +97,21 @@ class MatchingService:
         if len(waiting_entries) < 2:
             return None
 
-        users = [entry.user for entry in waiting_entries]
+        # Filter out college users whose window is closed (service accounts are exempt)
+        valid_users = []
+        for entry in waiting_entries:
+            user = entry.user
+            # Service accounts can always match
+            if user.is_service_account:
+                valid_users.append(user)
+            # College users can only match if their window is open
+            elif user.college and cls.is_college_window_open(user.college):
+                valid_users.append(user)
+
+        if len(valid_users) < 2:
+            return None
+
+        users = valid_users
 
         # Strategy 1: Find pairs where at least one user is completely fresh (never chatted)
         fresh_users = []
@@ -307,7 +337,20 @@ class MatchingService:
             if removed_any:
                 continue
 
-            # Neither user has an active chat -> create a new chat
+# Neither user has an active chat
+            # Validate that college users' windows are open before creating chat
+            if not user1.is_service_account and user1.college:
+                if not cls.is_college_window_open(user1.college):
+                    # Remove from waiting list and try again
+                    WaitingListEntry.objects.filter(user=user1).delete()
+                    continue
+
+            if not user2.is_service_account and user2.college:
+                if not cls.is_college_window_open(user2.college):
+                    # Remove from waiting list and try again
+                    WaitingListEntry.objects.filter(user=user2).delete()
+                    continue
+
             # Determine college for the chat
             chat_college = college
             if user1.is_service_account or user2.is_service_account:
