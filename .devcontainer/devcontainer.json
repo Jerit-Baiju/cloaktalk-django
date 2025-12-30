@@ -1,0 +1,8 @@
+{
+  "name": "cloaktalk-django",
+  "image": "mcr.microsoft.com/devcontainers/python:2-3.12-bookworm",
+  "runArgs": [
+    "--network=infra_default"
+  ],
+  "postCreateCommand": "pip3 install --user -r requirements.txt"
+}
