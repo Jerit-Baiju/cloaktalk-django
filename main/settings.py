@@ -213,6 +213,17 @@ CACHES = {
     }
 }
 
-# Session Configuration using Redis
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-SESSION_CACHE_ALIAS = "default"
+# Session Configuration - Use database for persistence
+# Changed from cache to database to persist sessions across restarts
+# Note: JWT tokens are the primary authentication mechanism, 
+# but Django sessions are still used by the admin panel
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_AGE = 2592000  # 30 days
+SESSION_SAVE_EVERY_REQUEST = False
+
+# Cookie settings for cross-origin requests
+SESSION_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
+SESSION_COOKIE_SECURE = not DEBUG  # True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG
