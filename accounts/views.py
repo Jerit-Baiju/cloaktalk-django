@@ -150,16 +150,9 @@ class GoogleLogin(APIView):
             domain = get_domain_from_email(email)
             existing_user = User.objects.filter(email=email).first()
             is_service_account = existing_user and existing_user.is_service_account
-
-            # Reject Gmail users unless they're service accounts
-            if domain.lower() in {"gmail.com", "googlemail.com"} and not is_service_account:
-                return Response(
-                    {
-                        "error": "only_organization_email_allowed",
-                        "detail": "Only organization email IDs are allowed. Please sign in with your college or company email.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            
+            # Check if this is a non-organization email (Gmail, etc.)
+            is_non_org_email = domain.lower() in {"gmail.com", "googlemail.com"}
 
             # Handle service accounts (no college assignment)
             if is_service_account:
@@ -215,8 +208,48 @@ class GoogleLogin(APIView):
                     status=status.HTTP_200_OK,
                 )
 
-            # Organization or non-gmail domain: ensure active user creation
+            # Handle non-organization emails (create account but don't allow login)
+            elif is_non_org_email:
+                user = User.objects.filter(email=email).first()
+                if not user:
+                    username = self._generate_unique_username(email)
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        first_name=given_name,
+                        last_name=family_name,
+                        college=None,  # No college for non-org emails
+                        is_active=False,  # Keep inactive
+                    )
+
+                    # Attempt to download the user's avatar if available
+                    if picture_url:
+                        try:
+                            response = requests.get(picture_url, timeout=10)
+                            if response.status_code == 200:
+                                user.avatar.save(f"{email}.png", ContentFile(
+                                    response.content), save=True)
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error downloading avatar: {e}")
+
+                # Update GoogleToken
+                google_token, _ = GoogleToken.objects.get_or_create(user=user)
+                google_token.access_token = google_access_token
+                google_token.refresh_token = google_refresh_token
+                google_token.save()
+
+                # Return error response (don't allow login)
+                return Response(
+                    {
+                        "error": "only_organization_email_allowed",
+                        "detail": "Only organization email IDs are allowed. Please sign in with your college or company email.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Organization emails: handle college assignment
             else:
+                # For organization emails, find or create college
                 college = College.objects.filter(domain=domain).first()
 
                 # If no college exists for this domain, create one with is_active=False
