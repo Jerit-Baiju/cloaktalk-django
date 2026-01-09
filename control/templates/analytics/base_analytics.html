@@ -37,21 +37,21 @@
       <!-- Sidebar -->
       <aside class="w-72 hidden md:block border-r border-white/10 bg-ctdark/60">
         <div class="p-6">
-          <a href="{% url 'analytics:dashboard' %}" class="flex items-center gap-2 text-ctpink-400 font-semibold text-lg">
+          <a href="{% url 'control:dashboard' %}" class="flex items-center gap-2 text-ctpink-400 font-semibold text-lg">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
               <path d="M3 3h18v2H3zM5 7h14v2H5zM7 11h10v2H7zM9 15h6v2H9zM11 19h2v2h-2z" />
             </svg>
-            Analytics
+            CloakTalk Admin
           </a>
         </div>
         <nav class="px-4 space-y-1">
-          <a href="{% url 'analytics:dashboard' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Dashboard</a>
-          <a href="{% url 'analytics:daily_analytics' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Daily Analytics</a>
-          <a href="{% url 'analytics:daily_chat_reader' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Daily Chat Reader</a>
-          <a href="{% url 'analytics:colleges_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Colleges</a>
-          <a href="{% url 'analytics:users_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Users</a>
-          <a href="{% url 'analytics:chats_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">All Chats</a>
-          <a href="{% url 'analytics:chat_reader' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Read From Start</a>
+          <a href="{% url 'control:dashboard' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Dashboard</a>
+          <a href="{% url 'control:daily_analytics' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Daily Analytics</a>
+          <a href="{% url 'control:daily_chat_reader' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Daily Chat Reader</a>
+          <a href="{% url 'control:colleges_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Colleges</a>
+          <a href="{% url 'control:users_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Users</a>
+          <a href="{% url 'control:chats_list' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">All Chats</a>
+          <a href="{% url 'control:chat_reader' %}" class="block px-3 py-2 rounded-md hover:bg-white/5">Read From Start</a>
         </nav>
       </aside>
 
@@ -60,8 +60,8 @@
         <!-- Topbar -->
         <header class="sticky top-0 z-10 border-b border-white/10 bg-ctdark/70 backdrop-blur">
           <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-            <a href="{% url 'analytics:dashboard' %}" class="md:hidden text-ctpink-400 font-semibold">Analytics</a>
-            <form method="get" action="{% url 'analytics:chats_list' %}" class="flex-1">
+            <a href="{% url 'control:dashboard' %}" class="md:hidden text-ctpink-400 font-semibold">Analytics</a>
+            <form method="get" action="{% url 'control:chats_list' %}" class="flex-1">
               <div class="flex gap-2">
                 <input
                   name="q"
@@ -81,7 +81,7 @@
                 <button class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">Filter</button>
               </div>
             </form>
-            <a href="{% url 'analytics:chat_reader' %}" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Reader</a>
+            <a href="{% url 'control:chat_reader' %}" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Reader</a>
           </div>
         </header>
 

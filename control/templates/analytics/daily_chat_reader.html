@@ -20,13 +20,13 @@
   <div class="flex justify-center gap-4">
     {% if prev_day_with_chats %}
     <a
-      href="{% url 'analytics:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
+      href="{% url 'control:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
       class="px-4 py-2 rounded-lg bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
       Previous Day with Chats ({{ prev_day_with_chats|date:"M j" }})
     </a>
     {% endif %} {% if next_day_with_chats %}
     <a
-      href="{% url 'analytics:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
+      href="{% url 'control:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
       class="px-4 py-2 rounded-lg bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">
       Next Day with Chats ({{ next_day_with_chats|date:"M j" }})
     </a>
@@ -47,7 +47,7 @@
   <div class="flex items-center gap-2">
     {% if prev_day_with_chats %}
     <a
-      href="{% url 'analytics:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
+      href="{% url 'control:daily_chat_reader' %}?date={{ prev_day_with_chats|date:'Y-m-d' }}"
       class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">
       ← {{ prev_day_with_chats|date:"M j" }}
     </a>
@@ -64,7 +64,7 @@
 
     {% if next_day_with_chats %}
     <a
-      href="{% url 'analytics:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
+      href="{% url 'control:daily_chat_reader' %}?date={{ next_day_with_chats|date:'Y-m-d' }}"
       class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">
       {{ next_day_with_chats|date:"M j" }} →
     </a>
@@ -120,11 +120,11 @@
       </div>
 
       <div class="flex gap-2">
-        <a href="{% url 'analytics:chat_detail' current_chat.id %}" class="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">
+        <a href="{% url 'control:chat_detail' current_chat.id %}" class="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">
           Full Details
         </a>
         <a
-          href="{% url 'analytics:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
+          href="{% url 'control:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
           class="px-3 py-2 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
           Back to Daily View
         </a>
@@ -167,7 +167,7 @@
   {% endif %}
 
   <a
-    href="{% url 'analytics:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
+    href="{% url 'control:daily_analytics' %}?date={{ target_date|date:'Y-m-d' }}"
     class="px-6 py-3 rounded-lg bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
     View All Chats for This Day
   </a>

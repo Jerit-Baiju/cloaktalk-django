@@ -10,7 +10,7 @@ urlpatterns = [
     path("api/", include("base.urls")),
     path("auth/", include("accounts.urls")),
     path("admin/", admin.site.urls),
-    path("analytics/", include("analytics.urls")),
+    path("manage/", include("control.urls")),
 ]
 
 # Serve media files during development

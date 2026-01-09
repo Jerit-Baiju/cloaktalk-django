@@ -1,8 +1,8 @@
 from django.urls import path
 
-from analytics import views
+from control import views
 
-app_name = "analytics"
+app_name = "control"
 
 urlpatterns = [
     # Dashboard landing

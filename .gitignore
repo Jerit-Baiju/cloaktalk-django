@@ -2,7 +2,6 @@ __pycache__
 db.sqlite3
 .env
 .DS_Store
-migrations
 venv
 media
 staticfiles

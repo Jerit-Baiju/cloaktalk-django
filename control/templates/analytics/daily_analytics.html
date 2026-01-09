@@ -9,7 +9,7 @@
   <!-- Date Navigation -->
   <div class="flex items-center gap-2">
     <a
-      href="{% url 'analytics:daily_analytics' %}?date={{ prev_date|date:'Y-m-d' }}"
+      href="{% url 'control:daily_analytics' %}?date={{ prev_date|date:'Y-m-d' }}"
       class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -28,7 +28,7 @@
 
     {% if next_date <= today %}
     <a
-      href="{% url 'analytics:daily_analytics' %}?date={{ next_date|date:'Y-m-d' }}"
+      href="{% url 'control:daily_analytics' %}?date={{ next_date|date:'Y-m-d' }}"
       class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2">
       Next Day
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -77,7 +77,7 @@
           <div class="text-sm text-gray-400">{{ page_obj.paginator.count }} total chats</div>
           {% if chats_today_count > 0 %}
           <a
-            href="{% url 'analytics:daily_chat_reader' %}?date={{ target_date|date:'Y-m-d' }}"
+            href="{% url 'control:daily_chat_reader' %}?date={{ target_date|date:'Y-m-d' }}"
             class="px-3 py-1 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
             Read Through All
           </a>
@@ -92,7 +92,7 @@
           <div class="flex items-start justify-between">
             <div class="flex-1">
               <div class="flex items-center gap-3 mb-2">
-                <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium text-ctpink-400 hover:underline">
+                <a href="{% url 'control:chat_detail' chat.id %}" class="font-medium text-ctpink-400 hover:underline">
                   {{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}
                 </a>
                 <span class="text-xs px-2 py-1 rounded bg-white/10 text-gray-300"> {{ chat.college.name|default:"Cross-Org" }} </span>
@@ -114,12 +114,12 @@
 
             <div class="flex gap-2">
               <a
-                href="{% url 'analytics:chat_detail' chat.id %}"
+                href="{% url 'control:chat_detail' chat.id %}"
                 class="px-3 py-1 rounded bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30 text-sm">
                 View
               </a>
               <a
-                href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}"
+                href="{% url 'control:chat_reader' %}?start={{ chat.id }}"
                 class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-sm">
                 Read
               </a>
@@ -181,7 +181,7 @@
       <div class="space-y-2">
         {% for user in users_registered %}
         <div class="text-sm">
-          <a href="{% url 'analytics:user_detail' user.id %}" class="text-ctpink-400 hover:underline">{{ user.display_name }}</a>
+          <a href="{% url 'control:user_detail' user.id %}" class="text-ctpink-400 hover:underline">{{ user.display_name }}</a>
           <div class="text-xs text-gray-500">{{ user.email }}</div>
           <div class="text-xs text-gray-500">{{ user.created_at|date:"H:i" }}</div>
         </div>
@@ -196,7 +196,7 @@
       <div class="space-y-1">
         {% for day_data in days_with_chats %}
         <a
-          href="{% url 'analytics:daily_analytics' %}?date={{ day_data.day|date:'Y-m-d' }}"
+          href="{% url 'control:daily_analytics' %}?date={{ day_data.day|date:'Y-m-d' }}"
           class="block px-3 py-2 rounded text-sm hover:bg-white/10 {% if day_data.day.date == target_date %}bg-ctpink-500/20 text-ctpink-400{% endif %}">
           <div class="flex justify-between">
             <span>{{ day_data.day|date:"M j" }}</span>
@@ -208,7 +208,7 @@
 
       <div class="mt-4 pt-3 border-t border-white/10">
         <a
-          href="{% url 'analytics:daily_analytics' %}"
+          href="{% url 'control:daily_analytics' %}"
           class="block px-3 py-2 rounded text-sm text-center bg-ctpink-500/20 text-ctpink-400 hover:bg-ctpink-500/30">
           Today
         </a>

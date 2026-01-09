@@ -10,8 +10,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 
 from accounts.models import GoogleToken, User
+from accounts.serializers import TokenRefreshSerializer
 from accounts.utils import get_domain_from_email
 from base.models import College
 
@@ -412,3 +414,11 @@ class UserView(APIView):
         }
 
         return Response(user_data, status=status.HTTP_200_OK)
+
+
+class TokenRefreshView(BaseTokenRefreshView):
+    """
+    Custom token refresh view that uses our custom serializer
+    to handle cases where the user no longer exists.
+    """
+    serializer_class = TokenRefreshSerializer

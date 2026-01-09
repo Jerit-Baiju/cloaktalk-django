@@ -33,7 +33,7 @@
         <td class="py-3 px-4 text-right">{{ item.chat_count }}</td>
         <td class="py-3 px-4 text-right">{{ item.msg_count }}</td>
         <td class="py-3 px-4 text-right">
-          <a href="{% url 'analytics:college_detail' item.college.id %}" class="text-ctpink-400">View</a>
+          <a href="{% url 'control:college_detail' item.college.id %}" class="text-ctpink-400">View</a>
         </td>
       </tr>
       {% empty %}

@@ -154,7 +154,7 @@ def user_chats(request, user_id):
     start_with = request.GET.get("start")
     if start_with == "reader" and qs.exists():
         first = qs.first()
-        return redirect("analytics:chat_detail", chat_id=first.id)
+        return redirect("control:chat_detail", chat_id=first.id)
 
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -486,7 +486,7 @@ def colleges_list(request):
 
 @staff_member_required
 def college_detail(request, college_id: int):
-    """College specific analytics: message count, users count + list, chats count + list."""
+    """College specific control: message count, users count + list, chats count + list."""
     college = get_object_or_404(College, pk=college_id)
 
     # Filters and sorting

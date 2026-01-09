@@ -6,16 +6,16 @@
   </div>
   <div class="flex items-center gap-2">
     {% if prev_chat %}
-    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_detail' prev_chat.id %}">Prev chat</a>
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'control:chat_detail' prev_chat.id %}">Prev chat</a>
     {% endif %} {% if next_chat %}
-    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_detail' next_chat.id %}">Next chat</a>
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'control:chat_detail' next_chat.id %}">Next chat</a>
     {% endif %}
     <a
       class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
-      href="{% url 'analytics:chat_detail' chat.id %}?swap={% if not swap %}1{% else %}0{% endif %}"
+      href="{% url 'control:chat_detail' chat.id %}?swap={% if not swap %}1{% else %}0{% endif %}"
       >Swap sides</a
     >
-    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}"
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'control:chat_reader' %}?start={{ chat.id }}"
       >Open in Reader</a
     >
   </div>

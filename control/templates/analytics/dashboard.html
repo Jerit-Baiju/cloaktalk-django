@@ -3,7 +3,7 @@
 <!-- Quick Access to Today's Analytics -->
 <div class="mb-6">
   <a
-    href="{% url 'analytics:daily_analytics' %}"
+    href="{% url 'control:daily_analytics' %}"
     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold transition-colors">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
       <path
@@ -14,7 +14,7 @@
     View Today's Analytics
   </a>
   <a
-    href="{% url 'analytics:colleges_list' %}"
+    href="{% url 'control:colleges_list' %}"
     class="inline-flex items-center gap-2 px-4 py-2 ml-3 rounded-lg bg-white/10 hover:bg-white/20 text-gray-100 font-semibold transition-colors">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l9 6-9 6-9-6 9-6zm0 12l9-6v9H3v-9l9 6z" />
@@ -52,7 +52,7 @@
   <div class="glass rounded-xl p-5">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Chats by Day</h2>
-      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:chats_list' %}">See all</a>
+      <a class="text-ctpink-400 text-sm" href="{% url 'control:chats_list' %}">See all</a>
     </div>
     <div class="mt-4 space-y-2 text-sm">
       {% for row in chats_by_day %}
@@ -85,13 +85,13 @@
   <div class="glass rounded-xl p-5">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Top Chats by Messages</h2>
-      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:chats_list' %}?sort=-msgs">View</a>
+      <a class="text-ctpink-400 text-sm" href="{% url 'control:chats_list' %}?sort=-msgs">View</a>
     </div>
     <ul class="mt-4 divide-y divide-white/5">
       {% for chat in chat_message_counts %}
       <li class="py-3 flex items-center justify-between">
         <div class="text-sm text-gray-300">
-          <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium hover:underline"
+          <a href="{% url 'control:chat_detail' chat.id %}" class="font-medium hover:underline"
             >{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a
           >
           <div class="text-xs text-gray-400">{{ chat.college.name|default:"Cross-Org" }}</div>
@@ -109,7 +109,7 @@
       {% for u in top_users %}
       <li class="py-3 flex items-center justify-between">
         <div class="text-sm text-gray-300">
-          <a href="{% url 'analytics:user_chats' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
+          <a href="{% url 'control:user_chats' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
           <div class="text-xs text-gray-400">{{ u.email }}</div>
         </div>
         <div class="text-ctpink-400 font-semibold">{{ u.msgs }}</div>
@@ -122,13 +122,13 @@
   <div class="glass rounded-xl p-5">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Students by College</h2>
-      <a class="text-ctpink-400 text-sm" href="{% url 'analytics:users_list' %}">View All</a>
+      <a class="text-ctpink-400 text-sm" href="{% url 'control:users_list' %}">View All</a>
     </div>
     <ul class="mt-4 divide-y divide-white/5">
       {% for college in college_registrations %}
       <li class="py-3 flex items-center justify-between">
         <div class="text-sm text-gray-300">
-          <a href="{% url 'analytics:college_detail' college.college__id %}" class="font-medium hover:underline"
+          <a href="{% url 'control:college_detail' college.college__id %}" class="font-medium hover:underline"
             >{{ college.college__name }}</a
           >
           <div class="text-xs text-gray-400">Registered Students</div>

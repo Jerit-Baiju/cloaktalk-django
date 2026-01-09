@@ -5,7 +5,7 @@
     <h1 class="text-xl font-semibold">{{ college.name }}</h1>
     <div class="text-sm text-gray-400">Domain: {{ college.domain }}</div>
   </div>
-  <a href="{% url 'analytics:colleges_list' %}" class="text-ctpink-400">Back to Colleges</a>
+  <a href="{% url 'control:colleges_list' %}" class="text-ctpink-400">Back to Colleges</a>
 </div>
 
 <!-- KPIs -->
@@ -73,7 +73,7 @@
       {% for u in users_page_obj %}
       <li class="p-4 flex items-center justify-between">
         <div class="text-sm">
-          <a href="{% url 'analytics:user_detail' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
+          <a href="{% url 'control:user_detail' u.id %}" class="font-medium hover:underline">{{ u.display_name }}</a>
           <div class="text-xs text-gray-400">{{ u.email }}</div>
         </div>
         <div class="text-right text-xs">
@@ -110,7 +110,7 @@
       {% for chat in chats_page_obj %}
       <li class="p-4 flex items-center justify-between">
         <div class="text-sm">
-          <a href="{% url 'analytics:chat_detail' chat.id %}" class="font-medium hover:underline">{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a>
+          <a href="{% url 'control:chat_detail' chat.id %}" class="font-medium hover:underline">{{ chat.participant1.display_name }} ↔ {{ chat.participant2.display_name }}</a>
           <div class="text-xs text-gray-400">Created {{ chat.created_at|date:'Y-m-d H:i' }}</div>
         </div>
         <div class="text-right text-xs">

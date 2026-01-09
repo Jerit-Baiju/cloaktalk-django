@@ -8,13 +8,13 @@
     {% if prev_chat %}
     <a
       class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20"
-      href="{% url 'analytics:chat_reader' %}?start={{ prev_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
+      href="{% url 'control:chat_reader' %}?start={{ prev_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
       >Prev</a
     >
     {% endif %} {% if next_chat %}
     <a
       class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
-      href="{% url 'analytics:chat_reader' %}?start={{ next_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
+      href="{% url 'control:chat_reader' %}?start={{ next_chat.id }}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}"
       >Next</a
     >
     {% else %}

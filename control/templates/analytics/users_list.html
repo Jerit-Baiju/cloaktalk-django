@@ -39,7 +39,7 @@
       <tr class="hover:bg-white/5">
         <td class="px-4 py-3">
           <div class="font-medium">
-            <a class="hover:underline" href="{% url 'analytics:user_detail' u.id %}">{{ u.display_name }}</a>
+            <a class="hover:underline" href="{% url 'control:user_detail' u.id %}">{{ u.display_name }}</a>
           </div>
           <div class="text-xs text-gray-400">{{ u.email }}</div>
         </td>
@@ -48,7 +48,7 @@
         <td class="px-4 py-3 text-center text-ctpink-400 font-semibold">{{ u.messages_sent }}</td>
         <td class="px-4 py-3 text-gray-300">{{ u.created_at }}</td>
         <td class="px-4 py-3 text-right">
-          <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:user_chats' u.id %}">View Chats</a>
+          <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'control:user_chats' u.id %}">View Chats</a>
         </td>
       </tr>
       {% empty %}

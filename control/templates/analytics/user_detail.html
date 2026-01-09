@@ -9,7 +9,7 @@
     {% endif %}
   </div>
   <div class="flex items-center gap-2">
-    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'analytics:user_chats' user_obj.id %}">All Chats</a>
+    <a class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20" href="{% url 'control:user_chats' user_obj.id %}">All Chats</a>
   </div>
 </div>
 
@@ -31,7 +31,7 @@
 <div class="mt-8 glass rounded-xl">
   <div class="p-5 border-b border-white/10 flex items-center justify-between">
     <h2 class="font-semibold">Recent Chats</h2>
-    <a class="text-ctpink-400 text-sm" href="{% url 'analytics:user_chats' user_obj.id %}">View all</a>
+    <a class="text-ctpink-400 text-sm" href="{% url 'control:user_chats' user_obj.id %}">View all</a>
   </div>
   <div class="divide-y divide-white/5">
     {% for chat in recent_chats %}
@@ -39,12 +39,12 @@
       <div>
         {% if chat.participant1_id == user_obj.id %}
         <div class="font-medium">
-          <a class="hover:underline" href="{% url 'analytics:chat_detail' chat.id %}">{{ chat.participant2.display_name }}</a>
+          <a class="hover:underline" href="{% url 'control:chat_detail' chat.id %}">{{ chat.participant2.display_name }}</a>
         </div>
         <div class="text-xs text-gray-400">{{ chat.participant2.email }}</div>
         {% else %}
         <div class="font-medium">
-          <a class="hover:underline" href="{% url 'analytics:chat_detail' chat.id %}">{{ chat.participant1.display_name }}</a>
+          <a class="hover:underline" href="{% url 'control:chat_detail' chat.id %}">{{ chat.participant1.display_name }}</a>
         </div>
         <div class="text-xs text-gray-400">{{ chat.participant1.email }}</div>
         {% endif %}

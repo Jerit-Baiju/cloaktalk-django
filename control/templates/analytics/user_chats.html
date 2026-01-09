@@ -39,12 +39,12 @@
           <div class="flex items-center justify-end gap-2">
             <a
               class="px-3 py-1.5 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black"
-              href="{% url 'analytics:chat_detail' chat.id %}"
+              href="{% url 'control:chat_detail' chat.id %}"
               >Open</a
             >
             <a
               class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20"
-              href="{% url 'analytics:chat_reader' %}?start={{ chat.id }}&user={{ user_obj.id }}"
+              href="{% url 'control:chat_reader' %}?start={{ chat.id }}&user={{ user_obj.id }}"
               >Read Next of User</a
             >
           </div>
