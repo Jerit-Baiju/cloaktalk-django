@@ -1,11 +1,31 @@
 {% extends 'analytics/base_analytics.html' %}
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
-  <div>
-    <h1 class="text-xl font-semibold">{{ college.name }}</h1>
-    <div class="text-sm text-gray-400">Domain: {{ college.domain }}</div>
+  <div class="flex-1">
+    <div class="flex items-center gap-3">
+      <h1 class="text-xl font-semibold">{{ college.name }}</h1>
+      {% if college.is_active %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+          Active
+        </span>
+      {% else %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+          Inactive
+        </span>
+      {% endif %}
+    </div>
+    <div class="text-sm text-gray-400 mt-1">
+      Domain: {{ college.domain }} | Active Window: {{ college.window_start|time:"H:i" }} - {{ college.window_end|time:"H:i" }}
+    </div>
   </div>
-  <a href="{% url 'control:colleges_list' %}" class="text-ctpink-400">Back to Colleges</a>
+  <div class="flex items-center gap-3">
+    <a href="{% url 'control:college_toggle_active' college.id %}?next={{ request.get_full_path|urlencode }}" 
+       class="px-4 py-2 rounded-lg {% if college.is_active %}bg-red-500/20 hover:bg-red-500/30 text-red-400{% else %}bg-green-500/20 hover:bg-green-500/30 text-green-400{% endif %} font-semibold transition-colors"
+       onclick="return confirm('Are you sure you want to {% if college.is_active %}deactivate{% else %}activate{% endif %} {{ college.name }}?')">
+      {% if college.is_active %}Deactivate College{% else %}Activate College{% endif %}
+    </a>
+    <a href="{% url 'control:colleges_list' %}" class="text-ctpink-400">Back to Colleges</a>
+  </div>
 </div>
 
 <!-- KPIs -->

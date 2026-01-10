@@ -448,10 +448,16 @@ def daily_chat_reader(request):
 def colleges_list(request):
     """Overview list of colleges with basic aggregates and quick navigation."""
     q = request.GET.get("q")
+    status_filter = request.GET.get("status", "all")  # all, active, inactive
 
     colleges = College.objects.all()
     if q:
         colleges = colleges.filter(Q(name__icontains=q) | Q(domain__icontains=q))
+    
+    if status_filter == "active":
+        colleges = colleges.filter(is_active=True)
+    elif status_filter == "inactive":
+        colleges = colleges.filter(is_active=False)
 
     # Aggregates
     users_per_college = (
@@ -481,7 +487,21 @@ def colleges_list(request):
             }
         )
 
-    return render(request, "analytics/colleges_list.html", {"items": items, "q": q})
+    return render(request, "analytics/colleges_list.html", {"items": items, "q": q, "status_filter": status_filter})
+
+
+@staff_member_required
+def college_toggle_active(request, college_id: int):
+    """Toggle the active status of a college."""
+    college = get_object_or_404(College, pk=college_id)
+    college.is_active = not college.is_active
+    college.save()
+    
+    # Redirect back to the referring page or college detail
+    next_url = request.GET.get("next", "")
+    if next_url:
+        return redirect(next_url)
+    return redirect("control:college_detail", college_id=college_id)
 
 
 @staff_member_required

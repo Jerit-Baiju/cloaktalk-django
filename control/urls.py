@@ -23,4 +23,5 @@ urlpatterns = [
     # College focused views
     path("colleges/", views.colleges_list, name="colleges_list"),
     path("colleges/<int:college_id>/", views.college_detail, name="college_detail"),
+    path("colleges/<int:college_id>/toggle-active/", views.college_toggle_active, name="college_toggle_active"),
 ]

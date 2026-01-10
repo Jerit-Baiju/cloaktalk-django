@@ -1,25 +1,45 @@
 {% extends 'analytics/base_analytics.html' %} {% block content %}
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-xl font-semibold">Colleges</h1>
-  <form method="get" class="flex gap-2">
-    <input
-      name="q"
-      value="{{ q }}"
-      placeholder="Search college or domain"
-      class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
-    <button class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">Search</button>
-  </form>
+  <h1 class="text-xl font-semibold">Colleges Management</h1>
+  <a href="{% url 'control:dashboard' %}" class="text-ctpink-400 text-sm">← Back to Dashboard</a>
 </div>
+
+<!-- Filters -->
+<form method="get" class="glass rounded-xl p-4 mb-6">
+  <div class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[220px]">
+      <label class="block text-xs text-gray-400 mb-1">Search</label>
+      <input
+        name="q"
+        value="{{ q }}"
+        placeholder="Search college or domain"
+        class="w-full bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-xs text-gray-400 mb-1">Status</label>
+      <select name="status" class="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm">
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Colleges</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
+      </select>
+    </div>
+    <div>
+      <button class="px-4 py-2 rounded-md bg-ctpink-500 hover:bg-ctpink-400 text-black font-semibold">Apply Filters</button>
+    </div>
+  </div>
+</form>
 
 <div class="glass rounded-xl overflow-hidden">
   <table class="min-w-full text-sm">
     <thead class="bg-white/5">
       <tr>
         <th class="text-left py-3 px-4">College</th>
+        <th class="text-center py-3 px-4">Status</th>
+        <th class="text-center py-3 px-4">Window</th>
         <th class="text-right py-3 px-4">Users</th>
         <th class="text-right py-3 px-4">Chats</th>
         <th class="text-right py-3 px-4">Messages</th>
-        <th class="py-3 px-4"></th>
+        <th class="text-center py-3 px-4">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -29,16 +49,38 @@
           <div class="font-medium">{{ item.college.name }}</div>
           <div class="text-xs text-gray-400">{{ item.college.domain }}</div>
         </td>
+        <td class="py-3 px-4 text-center">
+          {% if item.college.is_active %}
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+              Active
+            </span>
+          {% else %}
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+              Inactive
+            </span>
+          {% endif %}
+        </td>
+        <td class="py-3 px-4 text-center text-xs text-gray-400">
+          {{ item.college.window_start|time:"H:i" }} - {{ item.college.window_end|time:"H:i" }}
+        </td>
         <td class="py-3 px-4 text-right">{{ item.user_count }}</td>
         <td class="py-3 px-4 text-right">{{ item.chat_count }}</td>
         <td class="py-3 px-4 text-right">{{ item.msg_count }}</td>
-        <td class="py-3 px-4 text-right">
-          <a href="{% url 'control:college_detail' item.college.id %}" class="text-ctpink-400">View</a>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <a href="{% url 'control:college_detail' item.college.id %}" class="text-ctpink-400 hover:underline">View</a>
+            <span class="text-gray-600">|</span>
+            <a href="{% url 'control:college_toggle_active' item.college.id %}?next={{ request.get_full_path|urlencode }}" 
+               class="text-blue-400 hover:underline"
+               onclick="return confirm('Are you sure you want to {% if item.college.is_active %}deactivate{% else %}activate{% endif %} {{ item.college.name }}?')">
+              {% if item.college.is_active %}Deactivate{% else %}Activate{% endif %}
+            </a>
+          </div>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="5" class="py-6 text-center text-gray-500">No colleges found</td>
+        <td colspan="7" class="py-6 text-center text-gray-500">No colleges found</td>
       </tr>
       {% endfor %}
     </tbody>
